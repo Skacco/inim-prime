@@ -363,6 +363,12 @@ def build_general_params_schema(
         OptionsKey.HIDE_UNUSED_PARTITIONS,
         default = bool(current_options.hide_unused_partitions) if current_options else True,
     )] = bool
+    # next to it: the other "what to show" switch
+    if has_native and has_primelan:
+        schema[vol.Required(
+            OptionsKey.SHOW_HIDDEN_OUTPUTS,
+            default = bool(current_options.show_hidden_outputs) if current_options else False,
+        )] = bool
     # Optional extra alarm panel protected by a PIN (code required to disarm):
     # it exists when a PIN is entered here. A plain text field on purpose,
     # browsers fill a password field with a saved password.
@@ -388,11 +394,6 @@ def build_general_params_schema(
         schema[vol.Required(
             OptionsKey.WEBHOOK_ALLOW_REMOTE,
             default = bool(current_options.webhook_allow_remote) if current_options else False,
-        )] = bool
-    if has_native and has_primelan:
-        schema[vol.Required(
-            OptionsKey.SHOW_HIDDEN_OUTPUTS,
-            default = bool(current_options.show_hidden_outputs) if current_options else False,
         )] = bool
     if has_primelan:
         fetch = (
