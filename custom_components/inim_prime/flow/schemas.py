@@ -431,7 +431,7 @@ def build_general_params_schema(
             )] = NumberSelector(NumberSelectorConfig(
                 min = NATIVE_CYCLE_PAUSE_MIN,
                 max = NATIVE_CYCLE_PAUSE_MAX,
-                step = 0.5,
+                step = 0.1,
                 unit_of_measurement = "s",
                 mode = NumberSelectorMode.BOX,
             ))

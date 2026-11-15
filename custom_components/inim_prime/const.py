@@ -48,14 +48,20 @@ PERIODIC_DROP_TOLERANCE = 5.0
 NATIVE_CYCLE_PAUSE_DEFAULT = False
 NATIVE_CYCLE_PAUSE_BEFORE_DEFAULT = 5.0
 NATIVE_CYCLE_PAUSE_AFTER_DEFAULT = 5.0
-NATIVE_CYCLE_PAUSE_MIN = 0.5
+NATIVE_CYCLE_PAUSE_MIN = 0.1
 NATIVE_CYCLE_PAUSE_MAX = 15.0
-# Head start given to the reads already queued on the connection, which are
-# let through before it is closed (0.6 to 1.7s was seen). Zero: no new read
-# is accepted from the configured moment and the connection closes when the
-# queued ones end, so somewhat later than configured. A 3s head start closed
-# it 3.1-3.5s ahead and the panel restarted its network all the same.
-NATIVE_CYCLE_PAUSE_DRAIN = 0.0
+# The connection is closed exactly the configured time before the instant,
+# whatever the size of the installation. For that no new request is sent
+# from a little earlier: the longest request measured on this panel, times
+# this factor plus this margin (seconds), within these bounds.
+NATIVE_CYCLE_PAUSE_LEAD_FACTOR = 1.2
+NATIVE_CYCLE_PAUSE_LEAD_MARGIN = 0.1
+NATIVE_CYCLE_PAUSE_LEAD_MIN = 0.2
+NATIVE_CYCLE_PAUSE_LEAD_MAX = 3.0
+# Used until enough requests have been measured.
+NATIVE_CYCLE_PAUSE_LEAD_DEFAULT = 0.6
+# Requests whose duration is remembered for the measure (a few minutes' worth).
+NATIVE_REQUEST_DURATIONS_KEPT = 2000
 
 # Native defaults
 NATIVE_PORT_DEFAULT: Final[int] = inim.prime.native.const.Panel.DEFAULT_PORT

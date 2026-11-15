@@ -45,7 +45,7 @@ def test_next_cycle_instant_is_on_the_cadence():
 
 async def test_requests_wait_for_the_pause_and_no_drop_is_recorded():
     adapter, client = _adapter()
-    assert await adapter.pause(idle_timeout = 1)
+    assert await adapter.pause(close_at = 0, idle_timeout = 1)
     assert client.disconnects == 1 and adapter.paused
 
     calls = []
@@ -69,7 +69,7 @@ async def test_requests_wait_for_the_pause_and_no_drop_is_recorded():
 
 async def test_command_issued_during_the_pause_is_sent_once_after_it():
     adapter, client = _adapter()
-    await adapter.pause(idle_timeout = 1)
+    await adapter.pause(close_at = 0, idle_timeout = 1)
     sent = []
 
     async def _command():
@@ -94,12 +94,12 @@ async def test_pause_waits_for_the_request_in_progress():
 
     request = asyncio.create_task(adapter._call_with_reconnect(_slow_read))
     await asyncio.sleep(0)
-    pause = asyncio.create_task(adapter.pause(idle_timeout = 1))
+    pause = asyncio.create_task(adapter.pause(close_at = 0, idle_timeout = 1))
     await asyncio.sleep(0.05)
     assert client.disconnects == 0
     release.set()
     assert await request == "data"
-    assert await pause is True and client.disconnects == 1
+    assert await pause is not None and client.disconnects == 1
     await adapter.resume()
 
 
@@ -112,7 +112,7 @@ async def test_pause_is_skipped_when_a_request_does_not_end_in_time():
 
     request = asyncio.create_task(adapter._call_with_reconnect(_stuck_read))
     await asyncio.sleep(0)
-    assert await adapter.pause(idle_timeout = 0.05) is False
+    assert await adapter.pause(close_at = 0, idle_timeout = 0.05) is None
     assert client.disconnects == 0 and not adapter.paused
     release.set()
     await request
@@ -121,16 +121,16 @@ async def test_pause_is_skipped_when_a_request_does_not_end_in_time():
 async def test_no_pause_during_an_outage_or_when_not_connected():
     adapter, client = _adapter()
     client.is_connected = False
-    assert await adapter.pause(idle_timeout = 0.05) is False
+    assert await adapter.pause(close_at = 0, idle_timeout = 0.05) is None
     client.is_connected = True
     adapter._outage_started = 1.0
-    assert await adapter.pause(idle_timeout = 0.05) is False
+    assert await adapter.pause(close_at = 0, idle_timeout = 0.05) is None
     assert client.disconnects == 0
 
 
 async def test_failed_reopen_falls_back_to_the_usual_reconnection():
     adapter, client = _adapter()
-    await adapter.pause(idle_timeout = 1)
+    await adapter.pause(close_at = 0, idle_timeout = 1)
 
     async def _refused():
         raise ConnectionRefusedError("panel restarting")
@@ -150,7 +150,7 @@ async def test_failed_reopen_falls_back_to_the_usual_reconnection():
 
 async def test_close_during_the_pause_does_not_reopen():
     adapter, client = _adapter()
-    await adapter.pause(idle_timeout = 1)
+    await adapter.pause(close_at = 0, idle_timeout = 1)
     await adapter.close()
     assert not adapter.paused
     await adapter.resume()
@@ -159,7 +159,6 @@ async def test_close_during_the_pause_does_not_reopen():
 
 async def test_cycle_task_closes_before_and_reopens_after(monkeypatch):
     adapter, client = _adapter()
-    monkeypatch.setattr(cp, "NATIVE_CYCLE_PAUSE_DRAIN", 3.0)
     clock = {"now": cp.next_cycle_instant(1_794_000_000.0) - 100.0}
     instant = cp.next_cycle_instant(clock["now"])
     events = []
@@ -186,8 +185,8 @@ async def test_cycle_task_closes_before_and_reopens_after(monkeypatch):
     client.disconnect, client.connect = _disconnect, _connect
     with pytest.raises(asyncio.CancelledError):
         await cp.run_cycle_pause(adapter, before = 2.0, after = 3.0)
-    # nothing was queued: closed at the start of the head start, 2 + 3 s ahead
-    assert events == [("closed", -5.0), ("opened", 3.0)]
+    # closed exactly 2 s ahead, whatever head start the requests were given
+    assert events == [("closed", -2.0), ("opened", 3.0)]
 
 
 def test_margins_are_clamped():
@@ -223,12 +222,12 @@ async def test_pause_waits_only_for_the_request_in_flight_not_for_the_queue():
     await asyncio.sleep(0)
     assert sent == ["zones"]
 
-    pause = asyncio.create_task(adapter.pause(idle_timeout = 1))
+    pause = asyncio.create_task(adapter.pause(close_at = 0, idle_timeout = 1))
     await asyncio.sleep(0.02)
     assert client.disconnects == 0, "never in the middle of a request"
     release.set()
     assert await in_flight == "zones"
-    assert await pause is True
+    assert await pause is not None
     assert client.disconnects == 1
     assert sent == ["zones"], "the queued requests were not sent before closing"
     assert not any(task.done() for task in queued)
@@ -241,7 +240,7 @@ async def test_pause_waits_only_for_the_request_in_flight_not_for_the_queue():
 
 async def test_resume_reports_a_refused_reopening():
     adapter, client = _adapter()
-    await adapter.pause(idle_timeout = 1)
+    await adapter.pause(close_at = 0, idle_timeout = 1)
 
     async def _refused():
         raise ConnectionRefusedError("panel restarting")
@@ -262,9 +261,106 @@ async def test_raw_memory_read_waits_for_the_pause():
 
     client._lock = asyncio.Lock()
     client._protocol = _Protocol()
-    await adapter.pause(idle_timeout = 1)
+    await adapter.pause(close_at = 0, idle_timeout = 1)
     read = asyncio.create_task(adapter.read_memory(0x10, 4))
     await asyncio.sleep(0.02)
     assert not reads
     await adapter.resume()
     assert await read == bytes(4) and reads == [0x10]
+
+
+def test_request_lead_follows_the_longest_measured_request():
+    adapter, _ = _adapter()
+    assert adapter.longest_request is None
+    assert adapter.request_lead == na.NATIVE_CYCLE_PAUSE_LEAD_DEFAULT
+    adapter._request_durations.extend([0.03, 0.42, 0.20])
+    assert adapter.longest_request == 0.42
+    assert adapter.request_lead == pytest.approx(0.42 * 1.2 + 0.1)
+    adapter._request_durations.append(0.01)
+    adapter._request_durations.extend([0.01] * na.NATIVE_REQUEST_DURATIONS_KEPT)
+    assert adapter.request_lead == na.NATIVE_CYCLE_PAUSE_LEAD_MIN, "old measures are forgotten"
+    adapter._request_durations.append(60.0)
+    assert adapter.request_lead == na.NATIVE_CYCLE_PAUSE_LEAD_MAX
+
+
+async def test_requests_are_measured_but_not_the_ones_through_a_reconnection():
+    adapter, client = _adapter()
+
+    async def _read():
+        await asyncio.sleep(0.03)
+        return "data"
+
+    assert await adapter._call_with_reconnect(_read) == "data"
+    assert len(adapter._request_durations) == 1
+    assert 0.02 < adapter.longest_request < 0.5
+
+    failed = []
+
+    async def _flaky():
+        if not failed:
+            failed.append(1)
+            raise ConnectionError("dropped")
+        return "data"
+
+    assert await adapter._call_with_reconnect(_flaky) == "data"
+    assert len(adapter._request_durations) == 1, "a request that needed a reconnection is not a measure"
+
+
+async def test_connection_stays_idle_and_closes_at_the_planned_time():
+    """The request in flight ends, nothing else is sent, and the connection
+    is closed at close_at: not as soon as it is free."""
+    import time
+    adapter, client = _adapter()
+    sent = []
+
+    async def _read():
+        sent.append(client.is_connected)
+        await asyncio.sleep(0.03)
+
+    in_flight = asyncio.create_task(adapter._call_with_reconnect(_read))
+    await asyncio.sleep(0)
+    close_at = time.time() + 0.15
+    pause = asyncio.create_task(adapter.pause(close_at = close_at, idle_timeout = 1))
+    late = asyncio.create_task(adapter._call_with_reconnect(_read))
+    await in_flight
+    await asyncio.sleep(0.05)
+    assert client.disconnects == 0, "free, but not yet the planned time"
+    assert sent == [True], "nothing is sent while waiting for the planned time"
+    closed_at = await pause
+    assert client.disconnects == 1
+    assert 0 <= closed_at - close_at < 0.05
+    await adapter.resume()
+    await late
+    assert sent == [True, True]
+
+
+async def test_slow_request_closes_late_and_is_reported(monkeypatch, caplog):
+    import logging
+    adapter, client = _adapter()
+    clock = {"now": cp.next_cycle_instant(1_794_000_000.0) - 100.0}
+    instant = cp.next_cycle_instant(clock["now"])
+    real_sleep = asyncio.sleep
+
+    async def _sleep(seconds):
+        clock["now"] += seconds
+        await real_sleep(0)
+
+    monkeypatch.setattr(cp.time, "time", lambda: clock["now"])
+    monkeypatch.setattr(cp.asyncio, "sleep", _sleep)
+
+    async def _pause(close_at, idle_timeout):
+        clock["now"] = close_at + 0.4          # a request ran over
+        adapter._resumed.clear()
+        client.disconnect()
+        return clock["now"]
+
+    async def _resume():
+        adapter._resumed.set()
+        raise asyncio.CancelledError            # one cycle is enough
+
+    adapter_cls = type(adapter)
+    monkeypatch.setattr(adapter_cls, "pause", lambda self, close_at, idle_timeout: _pause(close_at, idle_timeout))
+    monkeypatch.setattr(adapter_cls, "resume", lambda self: _resume())
+    with caplog.at_level(logging.WARNING, logger = cp.__name__), pytest.raises(asyncio.CancelledError):
+        await cp.run_cycle_pause(adapter, before = 1.0, after = 1.0)
+    assert any("0.40s later than planned" in record.message for record in caplog.records)

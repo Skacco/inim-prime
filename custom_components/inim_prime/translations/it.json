@@ -347,8 +347,8 @@
           "alarm_pin": "Se inserisci un PIN viene creata una seconda entità allarme che lo richiede per **disinserire** (l'inserimento resta libero). Comoda per un tablet a parete in una stanza ad accesso libero, lasciando quella originale senza PIN per il telefono.",
           "webhook_allow_remote": "Normalmente il webhook accetta solo richieste dalla LAN. Se Home Assistant è dietro un reverse proxy e vede anche le richieste locali come «remote» (il webhook viene rifiutato), attiva questa opzione. È sicuro: il webhook esegue solo un refresh ed è protetto dall'id segreto nell'URL.",
           "native_cycle_pause": "Circa ogni 71,6 minuti la centrale può riavviare le proprie connessioni di rete, e sembra farlo solo se in quel momento c'è una connessione locale aperta. Con questa opzione la connessione Native viene chiusa poco prima di quell'istante e riaperta poco dopo. Riguarda solo Native: PrimeLAN non viene toccata. Durante la pausa le entità mantengono l'ultimo valore, i comandi attendono la riapertura e la pausa non viene contata come caduta.",
-          "native_cycle_pause_before": "Quanto prima dell'istante del ciclo chiudere la connessione Native (da 0,5 a 15 secondi).",
-          "native_cycle_pause_after": "Quanto dopo l'istante del ciclo riaprirla (da 0,5 a 15 secondi). La centrale chiude le connessioni circa mezzo secondo dopo l'istante."
+          "native_cycle_pause_before": "Quanto prima dell'istante del ciclo la connessione Native viene chiusa: l'orario è esatto su qualsiasi impianto (da 0,1 a 15 secondi). Le letture vengono fermate un po' prima, il tempo che serve a finire quella in corso, misurato sulla tua centrale.",
+          "native_cycle_pause_after": "Quanto dopo l'istante del ciclo viene riaperta (da 0,1 a 15 secondi). La centrale agisce fino a circa mezzo secondo dopo l'istante."
         }
       },
       "scan": {

@@ -347,8 +347,8 @@
           "alarm_pin": "With a PIN entered, a second alarm entity is created that requires it to **disarm** (arming stays free). Handy for a wall tablet in a free-access room, leaving the original one without a PIN for your phone.",
           "webhook_allow_remote": "The webhook normally accepts LAN requests only. If Home Assistant is behind a reverse proxy and sees even local requests as «remote» (the webhook gets rejected), enable this. It is safe: the webhook only triggers a refresh and is guarded by the secret id in the URL.",
           "native_cycle_pause": "About every 71.6 minutes the panel may restart its own network connections, and it seems to do so only when a local connection is open at that moment. With this option the Native connection is closed shortly before that instant and reopened shortly after. Native only: PrimeLAN is not touched. During the pause the entities keep their last value, commands wait for the connection to reopen, and the pause is not counted as a drop.",
-          "native_cycle_pause_before": "How long before the cycle instant the Native connection is closed (0.5 to 15 seconds).",
-          "native_cycle_pause_after": "How long after the cycle instant it is reopened (0.5 to 15 seconds). The panel closes its connections about half a second after the instant."
+          "native_cycle_pause_before": "How long before the cycle instant the Native connection is closed: the time is exact on any installation (0.1 to 15 seconds). Reads are stopped a little earlier, the time needed for the one in progress to end, measured on your panel.",
+          "native_cycle_pause_after": "How long after the cycle instant it is reopened (0.1 to 15 seconds). The panel acts up to about half a second after the instant."
         }
       },
       "scan": {

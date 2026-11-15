@@ -15,6 +15,7 @@ import asyncio
 import logging
 import re
 import time
+from collections import deque
 from types import MappingProxyType
 from typing import Optional
 
@@ -56,6 +57,12 @@ from ..const import (
     NATIVE_RECONNECT_FAST_WINDOW,
     NATIVE_RECONNECT_MIN_INTERVAL,
     NATIVE_RECONNECT_SLOW_INTERVAL,
+    NATIVE_CYCLE_PAUSE_LEAD_DEFAULT,
+    NATIVE_CYCLE_PAUSE_LEAD_FACTOR,
+    NATIVE_CYCLE_PAUSE_LEAD_MARGIN,
+    NATIVE_CYCLE_PAUSE_LEAD_MAX,
+    NATIVE_CYCLE_PAUSE_LEAD_MIN,
+    NATIVE_REQUEST_DURATIONS_KEPT,
 )
 
 
@@ -262,6 +269,8 @@ class NativeAdapter:
         "_held_commands",
         "_resumed",
         "_link",
+        "_request_durations",
+        "_outages_seen",
         "_closed",
         "_timer_labels",
         "_timers",
@@ -295,6 +304,10 @@ class NativeAdapter:
         # queue here, and a pause takes it to close the connection between
         # two requests, never in the middle of one.
         self._link = asyncio.Lock()
+        # How long the last requests took, to know how early to stop sending
+        # them before a pause (see request_lead).
+        self._request_durations: deque = deque(maxlen = NATIVE_REQUEST_DURATIONS_KEPT)
+        self._outages_seen = 0
         self._closed = False
         self._timer_labels: dict[int, str] | None = None
         self._timers: dict[int, UnifiedTimer] = {}
@@ -331,29 +344,62 @@ class NativeAdapter:
     def paused(self) -> bool:
         return not self._resumed.is_set()
 
-    async def pause(self, idle_timeout: float) -> bool:
-        """Close the connection on purpose, until resume().
+    @property
+    def can_pause(self) -> bool:
+        """The connection is open and working: there is something to pause."""
+        return not (
+            self.paused or self._password_rejected
+            or self._outage_started is not None or not self._client.is_connected
+        )
 
-        Waits (at most idle_timeout) only for the request that is using the
-        connection: the ones queued behind it are not sent, they wait for
-        resume() like every later one. Nothing is recorded as a drop. Returns
-        False, leaving everything as it is, when there is nothing to pause or
-        the request in progress did not end in time."""
-        if self.paused or self._password_rejected or self._outage_started is not None:
-            return False
-        if not self._client.is_connected:
-            return False
+    @property
+    def longest_request(self) -> float | None:
+        """Longest of the recently measured requests (seconds), if any."""
+        return max(self._request_durations) if self._request_durations else None
+
+    @property
+    def request_lead(self) -> float:
+        """How long before a planned close no new request should be sent, so
+        that the one in flight has ended by then: from the longest request
+        measured on this panel."""
+        longest = self.longest_request
+        if longest is None:
+            return NATIVE_CYCLE_PAUSE_LEAD_DEFAULT
+        lead = longest * NATIVE_CYCLE_PAUSE_LEAD_FACTOR + NATIVE_CYCLE_PAUSE_LEAD_MARGIN
+        return min(max(lead, NATIVE_CYCLE_PAUSE_LEAD_MIN), NATIVE_CYCLE_PAUSE_LEAD_MAX)
+
+    async def pause(self, close_at: float, idle_timeout: float) -> float | None:
+        """Close the connection on purpose at close_at (wall-clock time),
+        until resume().
+
+        Called a little before close_at: from this moment no new request is
+        sent (they wait for resume(), like the ones already queued), the one
+        in flight ends, the connection stays idle and is closed at close_at.
+        A request still in flight at close_at is waited for, at most
+        idle_timeout from now, and the connection is closed as soon as it
+        ends: never in the middle of one. Nothing is recorded as a drop.
+
+        Returns the wall-clock time the connection was closed at, or None,
+        leaving everything as it is, when there is nothing to pause or the
+        request in flight did not end in time."""
+        if not self.can_pause:
+            return None
         self._resumed.clear()
         try:
             await asyncio.wait_for(self._link.acquire(), idle_timeout)
         except TimeoutError:
             self._resumed.set()
-            return False
+            return None
         try:
+            while (remaining := close_at - time.time()) > 0:
+                await asyncio.sleep(min(remaining, 0.5))
             self._client.disconnect()
+            return time.time()
+        except BaseException:
+            self._resumed.set()
+            raise
         finally:
             self._link.release()
-        return True
 
     async def resume(self) -> bool:
         """Reopen the connection closed by pause() and let the requests go on.
@@ -384,7 +430,14 @@ class NativeAdapter:
                     # the pause began while this request was queued: it is
                     # not sent, it waits for the connection to be reopened
                     continue
-                return await coro_factory()
+                started = time.monotonic()
+                outages = self._outages_seen
+                result = await coro_factory()
+                if outages == self._outages_seen and self._outage_started is None:
+                    # only ordinary requests: one that went through a
+                    # reconnection says nothing about how long they take
+                    self._request_durations.append(time.monotonic() - started)
+                return result
 
     async def _call_with_reconnect(self, coro_factory, resend_started_answer: bool = True):
         self._raise_if_password_rejected()
@@ -473,6 +526,7 @@ class NativeAdapter:
             return None
 
     def _note_outage(self, err: BaseException) -> None:
+        self._outages_seen += 1
         if self._outage_started is not None:
             return
         self._outage_started = asyncio.get_running_loop().time()
