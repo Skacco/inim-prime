@@ -56,6 +56,17 @@ async def _sleep_until(wall_time: float) -> None:
         await asyncio.sleep(min(remaining, 30.0))
 
 
+async def _sleep_until_requests_stop(adapter: NativeAdapter, close_at: float) -> float:
+    """Wait until the requests have to stop for the connection to be free at
+    close_at, and return the lead that was used.
+
+    The lead comes from the request durations saved as they happen, read
+    again at every wake-up: the one used is the one of that moment."""
+    while (remaining := close_at - adapter.request_lead - time.time()) > 0:
+        await asyncio.sleep(min(remaining, 30.0))
+    return adapter.request_lead
+
+
 # A close this much later than planned is reported (seconds).
 _LATE_CLOSE = 0.15
 
@@ -68,12 +79,7 @@ async def run_cycle_pause(adapter: NativeAdapter, before: float, after: float) -
     early the requests have to stop for that is measured on the panel."""
     while True:
         instant = next_cycle_instant(time.time() + before + NATIVE_CYCLE_PAUSE_LEAD_MAX + 1.0)
-        # Woken a little before the longest lead there can be, and the lead
-        # worked out only then, from the requests of the last minutes: one
-        # worked out at the previous cycle, 71 minutes earlier, says nothing.
-        await _sleep_until(instant - before - NATIVE_CYCLE_PAUSE_LEAD_MAX - 0.5)
-        lead = adapter.request_lead
-        await _sleep_until(instant - before - lead)
+        lead = await _sleep_until_requests_stop(adapter, instant - before)
         if not adapter.can_pause:
             _LOGGER.debug("Cycle pause skipped at this cycle: the Native connection is not open")
             await _sleep_until(instant + after + 1.0)
