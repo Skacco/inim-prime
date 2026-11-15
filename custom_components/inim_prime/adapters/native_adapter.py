@@ -355,7 +355,19 @@ class NativeAdapter:
     @property
     def longest_request(self) -> float | None:
         """Longest of the recently measured requests (seconds), if any."""
-        return max(self._request_durations) if self._request_durations else None
+        if not self._request_durations:
+            return None
+        return max(duration for _, duration in self._request_durations)
+
+    @property
+    def longest_request_by_kind(self) -> dict[str, float]:
+        """Longest recently measured request of each kind (seconds), the
+        slowest kind first."""
+        longest: dict[str, float] = {}
+        for kind, duration in self._request_durations:
+            if duration > longest.get(kind, 0.0):
+                longest[kind] = duration
+        return dict(sorted(longest.items(), key = lambda item: -item[1]))
 
     @property
     def request_lead(self) -> float:
@@ -424,7 +436,7 @@ class NativeAdapter:
             self._resumed.set()
         return reopened
 
-    async def _on_link(self, coro_factory):
+    async def _on_link(self, coro_factory, kind: str = "other"):
         """Run one request with the connection to itself, outside a pause."""
         while True:
             await self._resumed.wait()
@@ -439,12 +451,16 @@ class NativeAdapter:
                 if outages == self._outages_seen and self._outage_started is None:
                     # only ordinary requests: one that went through a
                     # reconnection says nothing about how long they take
-                    self._request_durations.append(time.monotonic() - started)
+                    self._request_durations.append((kind, time.monotonic() - started))
                 return result
 
-    async def _call_with_reconnect(self, coro_factory, resend_started_answer: bool = True):
+    async def _call_with_reconnect(
+            self, coro_factory, resend_started_answer: bool = True, kind: str = "other",
+    ):
         self._raise_if_password_rejected()
-        return await self._on_link(lambda: self._call_now(coro_factory, resend_started_answer))
+        return await self._on_link(
+            lambda: self._call_now(coro_factory, resend_started_answer), kind,
+        )
 
     async def _call_now(self, coro_factory, resend_started_answer: bool):
         try:
@@ -514,7 +530,9 @@ class NativeAdapter:
         if held:
             _LOGGER.debug("Command %s sent: the panel is back", key)
         try:
-            return await self._call_with_reconnect(coro_factory, resend_started_answer = False)
+            return await self._call_with_reconnect(
+                coro_factory, resend_started_answer = False, kind = "command",
+            )
         except ConnectionError as err:
             partial = _partial_response_bytes(err)
             if not partial:
@@ -603,7 +621,7 @@ class NativeAdapter:
 
     async def read_memory(self, address: int, length: int) -> bytes:
         """Read raw panel memory (used e.g. for the module-name table)."""
-        return await self._on_link(lambda: self._read_memory(address, length))
+        return await self._on_link(lambda: self._read_memory(address, length), "memory")
 
     # ------------------------------------------------------------------
     # Thermostats (temperature sensors)
@@ -654,7 +672,7 @@ class NativeAdapter:
             return self._thermostats
         # with the connection to itself and outside a pause, like every other
         # request, but without the reconnection logic (it never had it)
-        return await self._on_link(_do)
+        return await self._on_link(_do, "thermostats")
 
     @property
     def thermostats(self) -> dict:
@@ -762,7 +780,7 @@ class NativeAdapter:
                 for i, label in self._timer_labels.items()
             }
             return self.timers
-        return await self._call_with_reconnect(_do)
+        return await self._call_with_reconnect(_do, kind = "timers")
 
     @property
     def count_bypassed_zones(self) -> int:
@@ -820,7 +838,7 @@ class NativeAdapter:
             self._zones = result
             return self.zones
 
-        return await self._call_with_reconnect(_do)
+        return await self._call_with_reconnect(_do, kind = "zones")
 
     async def update_partitions(self) -> MappingProxyType[int, UnifiedPartition]:
         async def _do() -> MappingProxyType[int, UnifiedPartition]:
@@ -831,7 +849,7 @@ class NativeAdapter:
                 partitions[partition_id] = _partition_to_unified(partition)
             self._partitions = partitions
             return self.partitions
-        return await self._call_with_reconnect(_do)
+        return await self._call_with_reconnect(_do, kind = "partitions")
 
     async def update_outputs(self) -> MappingProxyType[int, UnifiedOutput]:
         async def _do() -> MappingProxyType[int, UnifiedOutput]:
@@ -842,7 +860,7 @@ class NativeAdapter:
                 outputs[output_id] = _output_to_unified(output)
             self._outputs = outputs
             return self.outputs
-        return await self._call_with_reconnect(_do)
+        return await self._call_with_reconnect(_do, kind = "outputs")
 
 
     # ------------------------------------------------------------------

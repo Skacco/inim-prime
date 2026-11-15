@@ -87,7 +87,7 @@ async def run_cycle_pause(adapter: NativeAdapter, before: float, after: float) -
                     "Cycle pause skipped at this cycle: a request was still "
                     "running %.1fs after the others were stopped (longest "
                     "measured: %s)",
-                    before + lead, _seconds(adapter.longest_request),
+                    before + lead, _longest(adapter),
                 )
             else:
                 late = closed_at - (instant - before)
@@ -96,7 +96,7 @@ async def run_cycle_pause(adapter: NativeAdapter, before: float, after: float) -
                     "panel's cycle (at the latest %.1fs), no new request from %.2fs "
                     "earlier (longest measured: %s), reopening %.1fs after it",
                     instant - closed_at, before, lead,
-                    _seconds(adapter.longest_request), after,
+                    _longest(adapter), after,
                 )
                 if late > _LATE_CLOSE:
                     _LOGGER.warning(
@@ -105,7 +105,7 @@ async def run_cycle_pause(adapter: NativeAdapter, before: float, after: float) -
                         "instead of %.1fs), a request took longer than the "
                         "longest measured so far (%s)",
                         late, instant - closed_at, before,
-                        _seconds(adapter.longest_request),
+                        _longest(adapter),
                     )
                 await _sleep_until(instant + after)
         finally:
@@ -124,8 +124,12 @@ async def run_cycle_pause(adapter: NativeAdapter, before: float, after: float) -
         await _sleep_until(instant + after + 1.0)
 
 
-def _seconds(value: float | None) -> str:
-    return "none yet" if value is None else f"{value:.2f}s"
+def _longest(adapter: NativeAdapter) -> str:
+    """The longest measured request of each kind, the slowest first."""
+    by_kind = adapter.longest_request_by_kind
+    if not by_kind:
+        return "none yet"
+    return ", ".join(f"{kind} {duration:.2f}s" for kind, duration in by_kind.items())
 
 
 def setup_cycle_pause(hass: HomeAssistant, entry: ConfigEntry, adapter: NativeAdapter | None) -> None:

@@ -274,13 +274,13 @@ def test_request_lead_follows_the_longest_measured_request():
     adapter, _ = _adapter()
     assert adapter.longest_request is None
     assert adapter.request_lead == na.NATIVE_CYCLE_PAUSE_LEAD_DEFAULT
-    adapter._request_durations.extend([0.03, 0.42, 0.20])
+    adapter._request_durations.extend([("partitions", 0.03), ("zones", 0.42), ("zones", 0.20)])
     assert adapter.longest_request == 0.42
     assert adapter.request_lead == pytest.approx(0.42 * 1.2 + 0.1)
-    adapter._request_durations.append(0.01)
-    adapter._request_durations.extend([0.01] * na.NATIVE_REQUEST_DURATIONS_KEPT)
+    assert adapter.longest_request_by_kind == {"zones": 0.42, "partitions": 0.03}
+    adapter._request_durations.extend([("zones", 0.01)] * na.NATIVE_REQUEST_DURATIONS_KEPT)
     assert adapter.request_lead == na.NATIVE_CYCLE_PAUSE_LEAD_MIN, "old measures are forgotten"
-    adapter._request_durations.append(60.0)
+    adapter._request_durations.append(("thermostats", 60.0))
     assert adapter.request_lead == na.NATIVE_CYCLE_PAUSE_LEAD_MAX
 
 
