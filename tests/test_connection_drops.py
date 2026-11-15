@@ -57,40 +57,34 @@ async def test_action_lists_recorded_drops_newest_first(recorder_mock, hass):
 
     cd.async_register(hass)
     answer = await hass.services.async_call(
-        DOMAIN, cd.SERVICE_CONNECTION_DROPS, {"hours": 1}, blocking = True, return_response = True,
+        DOMAIN, cd.SERVICE_CONNECTION_DROPS, {}, blocking = True, return_response = True,
     )
 
-    assert answer["numero"] == 2
+    assert answer["totale"] == 2
     assert sorted((d["connessione"], d["durata_secondi"]) for d in answer["cadute"]) == [
         ("Native", 8.3), ("PrimeLAN", 12.2),
     ]
     assert set(answer["cadute"][0]) == {"connessione", "inizio", "durata_secondi", "periodica"}
+    assert set(answer) == {"dal", "al", "totale", "periodiche", "altre", "cadute"}
 
-    # days and hours add up, and the default is the last 24 hours
-    for data in ({}, {"days": 3}, {"days": 2, "hours": 5}):
-        answer = await hass.services.async_call(
-            DOMAIN, cd.SERVICE_CONNECTION_DROPS, data, blocking = True, return_response = True,
-        )
-        assert answer["numero"] == 2, data
-
-    # periodic filter: true and false split the list, nothing is lost
-    split = {}
-    for kind, flag in (("periodic", True), ("other", False)):
-        filtered = await hass.services.async_call(
-            DOMAIN, cd.SERVICE_CONNECTION_DROPS, {"hours": 1, "kind": kind},
-            blocking = True, return_response = True,
-        )
-        assert all(d["periodica"] is flag for d in filtered["cadute"])
-        split[flag] = filtered["numero"]
-    assert split[True] + split[False] == 2
+    # the default is one day back
     from datetime import datetime, timedelta
     span = datetime.fromisoformat(answer["al"]) - datetime.fromisoformat(answer["dal"])
-    assert span == timedelta(days = 2, hours = 5)
+    assert span == timedelta(days = 1)
+    answer = await hass.services.async_call(
+        DOMAIN, cd.SERVICE_CONNECTION_DROPS, {"days": 3}, blocking = True, return_response = True,
+    )
+    assert answer["totale"] == 2
+    span = datetime.fromisoformat(answer["al"]) - datetime.fromisoformat(answer["dal"])
+    assert span == timedelta(days = 3)
 
-    # one connection only
-    for wanted, expected in (("native", ("Native", 8.3)), ("primelan", ("PrimeLAN", 12.2))):
-        answer = await hass.services.async_call(
-            DOMAIN, cd.SERVICE_CONNECTION_DROPS, {"hours": 1, "connection": wanted},
-            blocking = True, return_response = True,
-        )
-        assert [(d["connessione"], d["durata_secondi"]) for d in answer["cadute"]] == [expected]
+
+def test_counts_per_kind_and_connection():
+    def _drop(connection, periodic):
+        return {"connessione": connection, "periodica": periodic}
+
+    assert cd._count([]) == 0
+    assert cd._count([_drop("Native", False)] * 4) == "4 (Native 4)"
+    assert cd._count(
+        [_drop("Native", True), _drop("PrimeLAN", True), _drop("Native", True)]
+    ) == "3 (Native 2, PrimeLAN 1)"

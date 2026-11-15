@@ -257,21 +257,16 @@ Operator, Signal strength, Credit, Supply voltage.
 
 # Actions
 ## Connection drops (`inim_prime.connection_drops`)
-Lists the connection drops recorded in Home Assistant's history, newest first. Run it from **Developer tools → Actions**. All fields are optional:
-
-- **Days** (1-365) and **Hours** (1-240): how far back to look; they add up. Neither: the last 24 hours.
-- **Connection**: Native only or PrimeLAN only. Empty: both.
-- **Kind**: only the periodic ones (matching the panel's periodic network restart) or only the others. Empty: all.
+Lists the connection drops recorded in Home Assistant's history, newest first. Run it from **Developer tools → Actions**. One optional field: **Days** (1-365), how far back to look. Empty: 1 day.
 
 ```yaml
 action: inim_prime.connection_drops
 data:
   days: 2
-  connection: native
-  kind: periodic
 ```
 
-The answer has `dal`, `al`, `numero` and the `cadute` list, each with `connessione`, `inizio`, `durata_secondi` and `periodica`. The history covers what Home Assistant's recorder keeps (10 days by default).
+The answer has `dal`, `al`, `totale`, `periodiche` and `altre` (for example `2 (Native 1, PrimeLAN 1)`) and the `cadute` list, each with `connessione`, `inizio`, `durata_secondi` and `periodica`. The history covers what Home Assistant's recorder keeps (10 days by default).
+
 
 # Recommended configuration
 ## Rename the devices

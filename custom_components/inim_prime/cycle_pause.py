@@ -1,10 +1,10 @@
-"""Experimental: keep the Native connection closed across the panel's cycle.
+"""Keep the Native connection closed across the panel's periodic cycle.
 
 The panel was seen closing its network connections at instants that fall on
 a fixed cadence (PERIODIC_DROP_PHASE + k * PERIODIC_DROP_PERIOD, Unix time),
-and only when a local connection is open at that moment. With this option
-the Native connection is closed a few seconds before each instant and
-reopened a few seconds after. Only Native: PrimeLAN is never touched.
+and only when a local connection is open at that moment. With Native, the
+connection is closed shortly before each instant and reopened shortly after,
+always. Only Native: PrimeLAN is never touched.
 
 During the pause the entities keep their last value and the requests wait
 for the connection to come back; the pause is not recorded as a drop.
@@ -21,16 +21,13 @@ from homeassistant.core import HomeAssistant
 
 from .adapters.native_adapter import NativeAdapter
 from .const import (
-    NATIVE_CYCLE_PAUSE_AFTER_DEFAULT,
-    NATIVE_CYCLE_PAUSE_BEFORE_DEFAULT,
+    NATIVE_CYCLE_PAUSE_AFTER,
+    NATIVE_CYCLE_PAUSE_BEFORE,
     NATIVE_CYCLE_PAUSE_CLOSE_WHEN_FREE,
     NATIVE_CYCLE_PAUSE_LEAD_MAX,
-    NATIVE_CYCLE_PAUSE_MAX,
-    NATIVE_CYCLE_PAUSE_MIN,
     PERIODIC_DROP_PERIOD,
     PERIODIC_DROP_PHASE,
 )
-from .flow.const import OptionsKey
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -39,14 +36,6 @@ def next_cycle_instant(wall_time: float) -> float:
     """First instant of the cadence that comes after wall_time (Unix time)."""
     cycles = math.floor((wall_time - PERIODIC_DROP_PHASE) / PERIODIC_DROP_PERIOD) + 1
     return PERIODIC_DROP_PHASE + cycles * PERIODIC_DROP_PERIOD
-
-
-def _margin(value, default: float) -> float:
-    try:
-        seconds = float(value)
-    except (TypeError, ValueError):
-        return default
-    return min(max(seconds, NATIVE_CYCLE_PAUSE_MIN), NATIVE_CYCLE_PAUSE_MAX)
 
 
 async def _sleep_until(wall_time: float) -> None:
@@ -143,15 +132,13 @@ def _longest(adapter: NativeAdapter) -> str:
 
 
 def setup_cycle_pause(hass: HomeAssistant, entry: ConfigEntry, adapter: NativeAdapter | None) -> None:
-    """Start the pause task when the option is on and Native is configured."""
-    options = entry.options
-    if adapter is None or not options.get(OptionsKey.NATIVE_CYCLE_PAUSE):
+    """Start the pause task: always, when Native is configured."""
+    if adapter is None:
         return
-    before = _margin(options.get(OptionsKey.NATIVE_CYCLE_PAUSE_BEFORE), NATIVE_CYCLE_PAUSE_BEFORE_DEFAULT)
-    after = _margin(options.get(OptionsKey.NATIVE_CYCLE_PAUSE_AFTER), NATIVE_CYCLE_PAUSE_AFTER_DEFAULT)
+    before, after = NATIVE_CYCLE_PAUSE_BEFORE, NATIVE_CYCLE_PAUSE_AFTER
     _LOGGER.debug(
-        "Cycle pause enabled: Native connection closed from %.1fs before to "
-        "%.1fs after each cycle of the panel", before, after,
+        "Cycle pause: Native connection closed from %.1fs before to %.1fs "
+        "after each cycle of the panel", before, after,
     )
     task = entry.async_create_background_task(
         hass, run_cycle_pause(adapter, before, after), "inim_prime cycle pause",

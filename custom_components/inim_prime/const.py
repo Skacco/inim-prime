@@ -42,14 +42,12 @@ CONNECTION_GRACE_PERIOD = 30.0
 PERIODIC_DROP_PERIOD = 4294.967296
 PERIODIC_DROP_PHASE = 2147.483648
 PERIODIC_DROP_TOLERANCE = 5.0
-# Experimental option: the Native connection is closed shortly before each of
-# those instants and reopened shortly after, so the panel finds no local
-# connection open when its cycle comes round. Seconds, set in the options.
-NATIVE_CYCLE_PAUSE_DEFAULT = False
-NATIVE_CYCLE_PAUSE_BEFORE_DEFAULT = 5.0
-NATIVE_CYCLE_PAUSE_AFTER_DEFAULT = 5.0
-NATIVE_CYCLE_PAUSE_MIN = 0.1
-NATIVE_CYCLE_PAUSE_MAX = 15.0
+# The panel restarts its network at those instants only when a local
+# connection is open then: with Native, the connection is closed shortly
+# before each instant and reopened shortly after (seconds). Measured on two
+# Prime panels: closing up to 3s ahead and reopening from 0.5s after was clean.
+NATIVE_CYCLE_PAUSE_BEFORE = 0.5
+NATIVE_CYCLE_PAUSE_AFTER = 0.5
 # The connection is closed exactly the configured time before the instant,
 # whatever the size of the installation. For that no new request is sent
 # from a little earlier: the longest request measured on this panel, times

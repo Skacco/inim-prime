@@ -150,6 +150,10 @@ class InimPrimeOptionsFlowHandler(OptionsFlowWithReload):
             opts.pop(OptionsKey.ALARM_PANEL, None)
         if not opts.get(OptionsKey.ALARM_PANEL_NATIVE):
             opts.pop(OptionsKey.ALARM_PANEL_NATIVE, None)
+        # The cycle pause is no longer an option (always on with Native).
+        for key in (OptionsKey.NATIVE_CYCLE_PAUSE, OptionsKey.NATIVE_CYCLE_PAUSE_BEFORE,
+                    OptionsKey.NATIVE_CYCLE_PAUSE_AFTER):
+            opts.pop(key, None)
         if getattr(self, "_notify_webhook_url", False) and opts.get(OptionsKey.WEBHOOK_ID):
             self._notify_first_webhook_url(opts[OptionsKey.WEBHOOK_ID])
         return self.async_create_entry(title="", data=opts)
@@ -328,13 +332,6 @@ class InimPrimeOptionsFlowHandler(OptionsFlowWithReload):
                 self._pending[OptionsKey.WEBHOOK_ALLOW_REMOTE] = user_input[OptionsKey.WEBHOOK_ALLOW_REMOTE]
             if OptionsKey.PANEL_LOG_EVENTS_FETCH_LIMIT in user_input:
                 self._pending[OptionsKey.PANEL_LOG_EVENTS_FETCH_LIMIT] = user_input[OptionsKey.PANEL_LOG_EVENTS_FETCH_LIMIT]
-            for key in (
-                    OptionsKey.NATIVE_CYCLE_PAUSE,
-                    OptionsKey.NATIVE_CYCLE_PAUSE_BEFORE,
-                    OptionsKey.NATIVE_CYCLE_PAUSE_AFTER,
-            ):
-                if key in user_input:
-                    self._pending[key] = user_input[key]
             # The PIN field is optional: with a PIN the extra panel exists,
             # an empty submit removes both.
             self._pending[OptionsKey.ALARM_PIN] = pin
@@ -520,9 +517,6 @@ class InimPrimeOptionsFlowHandler(OptionsFlowWithReload):
             webhook_allow_remote=o.get("webhook_allow_remote"),
             alarm_pin_panel=o.get("alarm_pin_panel"),
             alarm_pin=o.get("alarm_pin"),
-            native_cycle_pause=o.get("native_cycle_pause"),
-            native_cycle_pause_before=o.get("native_cycle_pause_before"),
-            native_cycle_pause_after=o.get("native_cycle_pause_after"),
         )
 
     def _scenario_choices(self) -> list[tuple[int, str]]:

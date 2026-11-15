@@ -25,13 +25,7 @@ MAX_DAYS = 365
 _SLICE = timedelta(days = 1)
 
 CONNECTION_DROPS_SCHEMA = vol.Schema({
-    # the two add up; with neither, the last 24 hours
-    vol.Optional("days"): vol.All(vol.Coerce(int), vol.Range(min = 1, max = MAX_DAYS)),
-    vol.Optional("hours"): vol.All(vol.Coerce(int), vol.Range(min = 1, max = 240)),
-    # one connection only; both when left out
-    vol.Optional("connection"): vol.In(("native", "primelan")),
-    # only the periodic drops, or only the others; all of them when left out
-    vol.Optional("kind"): vol.In(("periodic", "other")),
+    vol.Optional("days", default = 1): vol.All(vol.Coerce(int), vol.Range(min = 1, max = MAX_DAYS)),
 })
 
 # unique_id suffix of the connectivity sensors -> name shown in the answer
@@ -84,15 +78,8 @@ async def _connection_drops(hass: HomeAssistant, call: ServiceCall) -> ServiceRe
     from homeassistant.components.recorder import get_instance, history
 
     entities = _connectivity_entities(hass)
-    wanted = call.data.get("connection")
-    if wanted is not None:
-        entities = {
-            entity_id: name for entity_id, name in entities.items() if name.lower() == wanted
-        }
     end = dt_util.utcnow()
-    days, hours = call.data.get("days"), call.data.get("hours")
-    period = timedelta(days = days or 0, hours = hours or 0) or timedelta(hours = 24)
-    start = end - min(period, timedelta(days = MAX_DAYS))
+    start = end - timedelta(days = call.data.get("days", 1))
 
     found: dict[tuple[str, str], dict[str, Any]] = {}
     slice_start = start
@@ -112,18 +99,28 @@ async def _connection_drops(hass: HomeAssistant, call: ServiceCall) -> ServiceRe
         slice_start = slice_end
 
     drops = [drop for drop in found.values() if drop["_start"] >= start]
-    kind = call.data.get("kind")
-    if kind is not None:
-        drops = [drop for drop in drops if drop["periodica"] is (kind == "periodic")]
     drops.sort(key = lambda drop: drop["_start"], reverse = True)
     for drop in drops:
         del drop["_start"]
     return {
         "dal": dt_util.as_local(start).isoformat(timespec = "seconds"),
         "al": dt_util.as_local(end).isoformat(timespec = "seconds"),
-        "numero": len(drops),
+        "totale": len(drops),
+        "periodiche": _count([drop for drop in drops if drop["periodica"]]),
+        "altre": _count([drop for drop in drops if not drop["periodica"]]),
         "cadute": drops,
     }
+
+
+def _count(drops: list[dict[str, Any]]) -> int | str:
+    """How many, then how many per connection: 0, or "3 (Native 2, PrimeLAN 1)"."""
+    if not drops:
+        return 0
+    per_connection = [
+        f"{name} {count}" for name in _CONNECTIONS.values()
+        if (count := sum(drop["connessione"] == name for drop in drops))
+    ]
+    return f"{len(drops)} ({', '.join(per_connection)})"
 
 
 def async_register(hass: HomeAssistant) -> None:

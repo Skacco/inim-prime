@@ -221,7 +221,7 @@ L'integrazione raggruppa le entità in pochi dispositivi.
 Rappresenta la centrale.
 - **Sensori:** Zone escluse, Memorie allarme zone, Memorie allarme aree, Scenario attivo.
 - **Diagnostica:** Tensione alimentazione, i sensori di **guasto** (Batteria scarica, Guasto rete, Linea telefonica assente, Disturbo radio, Sabotaggio, Guasto GSM, Guasto Internet, ecc.) e i sensori di **connessione** per modalità di integrazione (**Connessione Native** e/o **Connessione PrimeLAN**, `connectivity`): accesi quando l'ultimo polling della modalità è andato a buon fine, con l'attributo `ultimo_ok` (aggiornato al massimo una volta al minuto). Hanno anche due attributi a solo scopo diagnostico, `ultima_caduta` e `durata_ultima_caduta` (in secondi): è normale vederli aggiornati spesso, vedi la nota qui sotto. Ne compare uno per ogni modalità configurata — due se usi entrambi.
-- **Nota sulle cadute di connessione:** la centrale ogni tanto chiude le connessioni locali per circa 11 secondi, quando riavvia le proprie connessioni di rete. Succede in istanti che cadono su una cadenza fissa di ~71,6 minuti (2³² microsecondi), ma non a ogni ciclo. È un comportamento della centrale, non un guasto. L'integrazione mantiene lo stato delle entità, tiene in attesa i comandi e si ricollega da sola: i sensori di connessione restano accesi e passano a «disconnesso» solo se la centrale non torna entro 30 secondi.
+- **Nota sulle cadute di connessione:** ogni ~71,6 minuti la centrale può riavviare le proprie connessioni di rete per circa 11 secondi, se in quel momento è aperta una connessione Native. L'integrazione chiude la connessione per circa un secondo attorno a quegli istanti per evitarlo, mantenendo comunque stati e comandi.
 - **Registro eventi** (event entity): traccia i log della centrale. Non è in tempo reale (vedi sezione sulla card del registro).
 - **Pulsanti:** Annulla esclusioni zone, Cancella memorie aree, e i pulsanti degli **scenari**.
 - **Allarme** (`alarm_control_panel`): inserimento/disinserimento guidato dagli scenari (se configurato nelle opzioni).
@@ -258,21 +258,16 @@ Operatore, Potenza segnale, Credito, Tensione alimentazione.
 
 # Azioni
 ## Cadute di connessione (`inim_prime.connection_drops`)
-Elenca le cadute di connessione con la centrale registrate nello storico di Home Assistant, dalla più recente. Si lancia da **Strumenti per sviluppatori → Azioni**. Campi, tutti facoltativi:
-
-- **Giorni** (1-365) e **Ore** (1-240): quanto indietro guardare; si sommano. Senza nessuno dei due: ultime 24 ore.
-- **Connessione**: solo Native o solo PrimeLAN. Vuoto: entrambe.
-- **Tipologia**: solo le periodiche (coincidono con il riavvio periodico della rete della centrale) o solo le altre. Vuoto: tutte.
+Elenca le cadute di connessione con la centrale registrate nello storico di Home Assistant, dalla più recente. Si lancia da **Strumenti per sviluppatori → Azioni**. Un solo campo, facoltativo: **Giorni** (1-365), quanto indietro guardare. Vuoto: 1 giorno.
 
 ```yaml
 action: inim_prime.connection_drops
 data:
   days: 2
-  connection: native
-  kind: periodic
 ```
 
-La risposta contiene `dal`, `al`, `numero` e l'elenco `cadute`, ognuna con `connessione`, `inizio`, `durata_secondi` e `periodica`. Lo storico copre il periodo conservato dal registratore di Home Assistant (di default 10 giorni).
+La risposta contiene `dal`, `al`, `totale`, `periodiche` e `altre` (per esempio `2 (Native 1, PrimeLAN 1)`) e l'elenco `cadute`, ognuna con `connessione`, `inizio`, `durata_secondi` e `periodica`. Lo storico copre il periodo conservato dal registratore di Home Assistant (di default 10 giorni).
+
 
 # Configurazione consigliata
 ## Rinomina i dispositivi

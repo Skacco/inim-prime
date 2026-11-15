@@ -334,10 +334,7 @@
           "hide_unused_partitions": "Hide unused areas (areas with the default name, like AREA 013)",
           "realtime_push": "Realtime push (local webhook)",
           "alarm_pin": "PIN of the extra alarm panel",
-          "webhook_allow_remote": "Accept non-local requests (webhook)",
-          "native_cycle_pause": "Experimental: close the Native connection during the panel's cycle",
-          "native_cycle_pause_before": "Seconds before the cycle",
-          "native_cycle_pause_after": "Seconds after the cycle"
+          "webhook_allow_remote": "Accept non-local requests (webhook)"
         },
         "data_description": {
           "panel_log_events_fetch_limit": "Number of log events fetched per scan when new logs are detected. Default is recommended.\nThe integration will automatically fetch more if needed.",
@@ -345,10 +342,7 @@
           "hide_unused_partitions": "Areas never named in the panel keep the default name. Enable to hide them and their entities.",
           "realtime_push": "Optional, requires PrimeLAN mode. The panel sends events (zones, arming, alarm…) to Home Assistant via a local webhook, so entities update instantly. Configure it in Prime/STUDIO → PrimeLAN settings → Web API → outbound HTTP API. After saving, the URL appears at the top of this screen.",
           "alarm_pin": "With a PIN entered, a second alarm entity is created that requires it to **disarm** (arming stays free). Handy for a wall tablet in a free-access room, leaving the original one without a PIN for your phone.",
-          "webhook_allow_remote": "The webhook normally accepts LAN requests only. If Home Assistant is behind a reverse proxy and sees even local requests as «remote» (the webhook gets rejected), enable this. It is safe: the webhook only triggers a refresh and is guarded by the secret id in the URL.",
-          "native_cycle_pause": "About every 71.6 minutes the panel may restart its own network connections, and it seems to do so only when a local connection is open at that moment. With this option the Native connection is closed shortly before that instant and reopened shortly after. Native only: PrimeLAN is not touched. During the pause the entities keep their last value, commands wait for the connection to reopen, and the pause is not counted as a drop.",
-          "native_cycle_pause_before": "How long before the cycle instant the Native connection is closed: the time is exact on any installation (0.1 to 15 seconds). Reads are stopped a little earlier, the time needed for the one in progress to end, measured on your panel.",
-          "native_cycle_pause_after": "How long after the cycle instant it is reopened (0.1 to 15 seconds). The panel acts up to about half a second after the instant."
+          "webhook_allow_remote": "The webhook normally accepts LAN requests only. If Home Assistant is behind a reverse proxy and sees even local requests as «remote» (the webhook gets rejected), enable this. It is safe: the webhook only triggers a refresh and is guarded by the secret id in the URL."
         }
       },
       "scan": {
@@ -396,19 +390,7 @@
       "fields": {
         "days": {
           "name": "Days",
-          "description": "How many days back to look (1 to 365). Added to the hours."
-        },
-        "hours": {
-          "name": "Hours",
-          "description": "How many hours back to look (1 to 240). Added to the days. With neither days nor hours: last 24 hours."
-        },
-        "connection": {
-          "name": "Connection",
-          "description": "Only the drops of this connection. Leave empty for both."
-        },
-        "kind": {
-          "name": "Kind",
-          "description": "Only the drops of this kind: periodic (matching the panel's periodic network restart) or the others. Leave empty to see them all."
+          "description": "How many days back to look (1 to 365). Empty: 1 day."
         }
       }
     },
@@ -556,12 +538,6 @@
       "options": {
         "scenario": "Scenario (PrimeLAN)",
         "aree": "Partitions (Native)"
-      }
-    },
-    "connection_drop_kind": {
-      "options": {
-        "periodic": "Periodic",
-        "other": "Not periodic"
       }
     }
   },

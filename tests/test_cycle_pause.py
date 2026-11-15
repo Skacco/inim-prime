@@ -190,14 +190,6 @@ async def test_cycle_task_closes_before_and_reopens_after(monkeypatch):
     assert events == [("closed", -2.6), ("opened", 3.0)]
 
 
-def test_margins_are_clamped():
-    assert cp._margin(None, 5.0) == 5.0
-    assert cp._margin("x", 5.0) == 5.0
-    assert cp._margin(0, 5.0) == cp.NATIVE_CYCLE_PAUSE_MIN
-    assert cp._margin(99, 5.0) == cp.NATIVE_CYCLE_PAUSE_MAX
-    assert cp._margin(2, 5.0) == 2.0
-
-
 async def test_pause_waits_only_for_the_request_in_flight_not_for_the_queue():
     """The requests queued behind the one in flight are not sent: the
     connection closes as soon as that one ends, and they go after the pause."""
