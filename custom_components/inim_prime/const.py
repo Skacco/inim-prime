@@ -63,6 +63,10 @@ NATIVE_CYCLE_PAUSE_LEAD_MAX = 3.0
 # (the configured time is then the latest it can be closed at). False: it
 # stays open and idle until the configured time and is closed exactly then.
 NATIVE_CYCLE_PAUSE_CLOSE_WHEN_FREE = True
+# The lead is taken from this share of the measured requests: a rare slow one
+# does not lengthen every pause (it is waited for, and reported, when it
+# happens to be running at the planned time).
+NATIVE_CYCLE_PAUSE_LEAD_PERCENTILE = 0.98
 # Used until enough requests have been measured.
 NATIVE_CYCLE_PAUSE_LEAD_DEFAULT = 0.6
 # Requests whose duration is remembered for the measure (a few minutes' worth).

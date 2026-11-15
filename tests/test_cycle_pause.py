@@ -276,11 +276,14 @@ def test_request_lead_follows_the_longest_measured_request():
     assert adapter.request_lead == na.NATIVE_CYCLE_PAUSE_LEAD_DEFAULT
     adapter._request_durations.extend([("partitions", 0.03), ("zones", 0.42), ("zones", 0.20)])
     assert adapter.longest_request == 0.42
+    # 3 measures: the 98% mark is the longest
     assert adapter.request_lead == pytest.approx(0.42 * 1.2 + 0.1)
     assert adapter.longest_request_by_kind == {"zones": 0.42, "partitions": 0.03}
     adapter._request_durations.extend([("zones", 0.01)] * na.NATIVE_REQUEST_DURATIONS_KEPT)
     assert adapter.request_lead == na.NATIVE_CYCLE_PAUSE_LEAD_MIN, "old measures are forgotten"
     adapter._request_durations.append(("thermostats", 60.0))
+    assert adapter.request_lead == na.NATIVE_CYCLE_PAUSE_LEAD_MIN, "a single outlier is left out"
+    adapter._request_durations.extend([("thermostats", 60.0)] * 100)
     assert adapter.request_lead == na.NATIVE_CYCLE_PAUSE_LEAD_MAX
 
 
@@ -387,3 +390,45 @@ async def test_close_when_free_closes_as_soon_as_the_request_in_flight_ends():
     assert client.disconnects == 1
     assert closed_at < close_at - 4, "not kept open until the latest time"
     await adapter.resume()
+
+
+def test_a_rare_slow_request_does_not_set_the_lead():
+    adapter, _ = _adapter()
+    adapter._request_durations.extend([("zones", 0.30)] * 99 + [("zones", 2.01)])
+    assert adapter.longest_request == 2.01
+    assert adapter.typical_longest_request == 0.30
+    assert adapter.request_lead == pytest.approx(0.30 * 1.2 + 0.1)
+    adapter._request_durations.extend([("zones", 2.01)] * 3)
+    assert adapter.typical_longest_request == 2.01, "no longer rare: it counts"
+
+
+async def test_lead_is_worked_out_just_before_the_pause(monkeypatch):
+    """Measures taken between two cycles are the ones that count."""
+    adapter, client = _adapter()
+    clock = {"now": cp.next_cycle_instant(1_794_000_000.0) - 600.0}
+    instant = cp.next_cycle_instant(clock["now"] + 10)
+    real_sleep = asyncio.sleep
+    events = []
+
+    async def _sleep(seconds):
+        clock["now"] += seconds
+        if instant - clock["now"] < 100 and not adapter._request_durations:
+            adapter._request_durations.extend([("zones", 1.0)] * 10)   # slower now
+        await real_sleep(0)
+
+    monkeypatch.setattr(cp.time, "time", lambda: clock["now"])
+    monkeypatch.setattr(cp.asyncio, "sleep", _sleep)
+    disconnect = client.disconnect
+
+    def _disconnect():
+        events.append(round(instant - clock["now"], 1))
+        disconnect()
+
+    async def _connect():
+        raise asyncio.CancelledError
+
+    client.disconnect, client.connect = _disconnect, _connect
+    with pytest.raises(asyncio.CancelledError):
+        await cp.run_cycle_pause(adapter, before = 0.5, after = 1.0)
+    # requests stopped 0.5 + 1.0 * 1.2 + 0.1 = 1.8 s ahead, closed at once (nothing in flight)
+    assert events == [1.8]

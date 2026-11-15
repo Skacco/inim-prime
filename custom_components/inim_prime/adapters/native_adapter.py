@@ -13,6 +13,7 @@ from dataclasses import replace
 
 import asyncio
 import logging
+import math
 import re
 import time
 from collections import deque
@@ -62,6 +63,7 @@ from ..const import (
     NATIVE_CYCLE_PAUSE_LEAD_MARGIN,
     NATIVE_CYCLE_PAUSE_LEAD_MAX,
     NATIVE_CYCLE_PAUSE_LEAD_MIN,
+    NATIVE_CYCLE_PAUSE_LEAD_PERCENTILE,
     NATIVE_REQUEST_DURATIONS_KEPT,
 )
 
@@ -370,14 +372,24 @@ class NativeAdapter:
         return dict(sorted(longest.items(), key = lambda item: -item[1]))
 
     @property
+    def typical_longest_request(self) -> float | None:
+        """Duration that NATIVE_CYCLE_PAUSE_LEAD_PERCENTILE of the recently
+        measured requests do not exceed (seconds), if any."""
+        if not self._request_durations:
+            return None
+        durations = sorted(duration for _, duration in self._request_durations)
+        index = max(math.ceil(len(durations) * NATIVE_CYCLE_PAUSE_LEAD_PERCENTILE) - 1, 0)
+        return durations[index]
+
+    @property
     def request_lead(self) -> float:
         """How long before a planned close no new request should be sent, so
-        that the one in flight has ended by then: from the longest request
-        measured on this panel."""
-        longest = self.longest_request
-        if longest is None:
+        that the one in flight has ended by then: from the requests measured
+        on this panel in the last minutes, a rare slow one left out."""
+        typical = self.typical_longest_request
+        if typical is None:
             return NATIVE_CYCLE_PAUSE_LEAD_DEFAULT
-        lead = longest * NATIVE_CYCLE_PAUSE_LEAD_FACTOR + NATIVE_CYCLE_PAUSE_LEAD_MARGIN
+        lead = typical * NATIVE_CYCLE_PAUSE_LEAD_FACTOR + NATIVE_CYCLE_PAUSE_LEAD_MARGIN
         return min(max(lead, NATIVE_CYCLE_PAUSE_LEAD_MIN), NATIVE_CYCLE_PAUSE_LEAD_MAX)
 
     async def pause(

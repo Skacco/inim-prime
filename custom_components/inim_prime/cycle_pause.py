@@ -24,6 +24,7 @@ from .const import (
     NATIVE_CYCLE_PAUSE_AFTER_DEFAULT,
     NATIVE_CYCLE_PAUSE_BEFORE_DEFAULT,
     NATIVE_CYCLE_PAUSE_CLOSE_WHEN_FREE,
+    NATIVE_CYCLE_PAUSE_LEAD_MAX,
     NATIVE_CYCLE_PAUSE_MAX,
     NATIVE_CYCLE_PAUSE_MIN,
     PERIODIC_DROP_PERIOD,
@@ -66,11 +67,13 @@ async def run_cycle_pause(adapter: NativeAdapter, before: float, after: float) -
     and reopened exactly `after` seconds past it, on any installation: how
     early the requests have to stop for that is measured on the panel."""
     while True:
+        instant = next_cycle_instant(time.time() + before + NATIVE_CYCLE_PAUSE_LEAD_MAX + 1.0)
+        # Woken a little before the longest lead there can be, and the lead
+        # worked out only then, from the requests of the last minutes: one
+        # worked out at the previous cycle, 71 minutes earlier, says nothing.
+        await _sleep_until(instant - before - NATIVE_CYCLE_PAUSE_LEAD_MAX - 0.5)
         lead = adapter.request_lead
-        instant = next_cycle_instant(time.time() + before + lead)
         await _sleep_until(instant - before - lead)
-        # measured again now: it is what this pause really uses
-        lead = min(adapter.request_lead, max(instant - before - time.time(), 0.0))
         if not adapter.can_pause:
             _LOGGER.debug("Cycle pause skipped at this cycle: the Native connection is not open")
             await _sleep_until(instant + after + 1.0)
@@ -125,11 +128,12 @@ async def run_cycle_pause(adapter: NativeAdapter, before: float, after: float) -
 
 
 def _longest(adapter: NativeAdapter) -> str:
-    """The longest measured request of each kind, the slowest first."""
+    """The usual longest request, then the longest of each kind."""
     by_kind = adapter.longest_request_by_kind
     if not by_kind:
         return "none yet"
-    return ", ".join(f"{kind} {duration:.2f}s" for kind, duration in by_kind.items())
+    kinds = ", ".join(f"{kind} {duration:.2f}s" for kind, duration in by_kind.items())
+    return f"98% within {adapter.typical_longest_request:.2f}s; {kinds}"
 
 
 def setup_cycle_pause(hass: HomeAssistant, entry: ConfigEntry, adapter: NativeAdapter | None) -> None:
