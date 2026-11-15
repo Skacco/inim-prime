@@ -368,13 +368,16 @@ class NativeAdapter:
         lead = longest * NATIVE_CYCLE_PAUSE_LEAD_FACTOR + NATIVE_CYCLE_PAUSE_LEAD_MARGIN
         return min(max(lead, NATIVE_CYCLE_PAUSE_LEAD_MIN), NATIVE_CYCLE_PAUSE_LEAD_MAX)
 
-    async def pause(self, close_at: float, idle_timeout: float) -> float | None:
+    async def pause(
+            self, close_at: float, idle_timeout: float, close_when_free: bool = False,
+    ) -> float | None:
         """Close the connection on purpose at close_at (wall-clock time),
         until resume().
 
         Called a little before close_at: from this moment no new request is
         sent (they wait for resume(), like the ones already queued), the one
-        in flight ends, the connection stays idle and is closed at close_at.
+        in flight ends, the connection stays idle and is closed at close_at
+        (or at once, with close_when_free).
         A request still in flight at close_at is waited for, at most
         idle_timeout from now, and the connection is closed as soon as it
         ends: never in the middle of one. Nothing is recorded as a drop.
@@ -391,7 +394,7 @@ class NativeAdapter:
             self._resumed.set()
             return None
         try:
-            while (remaining := close_at - time.time()) > 0:
+            while not close_when_free and (remaining := close_at - time.time()) > 0:
                 await asyncio.sleep(min(remaining, 0.5))
             self._client.disconnect()
             return time.time()

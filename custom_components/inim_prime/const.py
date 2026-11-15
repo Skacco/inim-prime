@@ -58,6 +58,11 @@ NATIVE_CYCLE_PAUSE_LEAD_FACTOR = 1.2
 NATIVE_CYCLE_PAUSE_LEAD_MARGIN = 0.1
 NATIVE_CYCLE_PAUSE_LEAD_MIN = 0.2
 NATIVE_CYCLE_PAUSE_LEAD_MAX = 3.0
+# True: the connection is closed as soon as the request in flight has ended,
+# so anywhere between the moment the requests stop and the configured time
+# (the configured time is then the latest it can be closed at). False: it
+# stays open and idle until the configured time and is closed exactly then.
+NATIVE_CYCLE_PAUSE_CLOSE_WHEN_FREE = True
 # Used until enough requests have been measured.
 NATIVE_CYCLE_PAUSE_LEAD_DEFAULT = 0.6
 # Requests whose duration is remembered for the measure (a few minutes' worth).

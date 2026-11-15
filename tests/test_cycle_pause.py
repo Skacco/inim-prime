@@ -185,8 +185,9 @@ async def test_cycle_task_closes_before_and_reopens_after(monkeypatch):
     client.disconnect, client.connect = _disconnect, _connect
     with pytest.raises(asyncio.CancelledError):
         await cp.run_cycle_pause(adapter, before = 2.0, after = 3.0)
-    # closed exactly 2 s ahead, whatever head start the requests were given
-    assert events == [("closed", -2.0), ("opened", 3.0)]
+    # nothing in flight: closed as soon as the requests are stopped, the
+    # head start (0.6 s, nothing measured yet) ahead of the latest time
+    assert events == [("closed", -2.6), ("opened", 3.0)]
 
 
 def test_margins_are_clamped():
@@ -359,8 +360,30 @@ async def test_slow_request_closes_late_and_is_reported(monkeypatch, caplog):
         raise asyncio.CancelledError            # one cycle is enough
 
     adapter_cls = type(adapter)
-    monkeypatch.setattr(adapter_cls, "pause", lambda self, close_at, idle_timeout: _pause(close_at, idle_timeout))
+    monkeypatch.setattr(adapter_cls, "pause", lambda self, close_at, idle_timeout, **_: _pause(close_at, idle_timeout))
     monkeypatch.setattr(adapter_cls, "resume", lambda self: _resume())
     with caplog.at_level(logging.WARNING, logger = cp.__name__), pytest.raises(asyncio.CancelledError):
         await cp.run_cycle_pause(adapter, before = 1.0, after = 1.0)
     assert any("0.40s later than planned" in record.message for record in caplog.records)
+
+
+async def test_close_when_free_closes_as_soon_as_the_request_in_flight_ends():
+    import time
+    adapter, client = _adapter()
+    release = asyncio.Event()
+
+    async def _read():
+        await release.wait()
+
+    in_flight = asyncio.create_task(adapter._call_with_reconnect(_read))
+    await asyncio.sleep(0)
+    close_at = time.time() + 5
+    pause = asyncio.create_task(adapter.pause(close_at = close_at, idle_timeout = 1, close_when_free = True))
+    await asyncio.sleep(0.02)
+    assert client.disconnects == 0, "never in the middle of a request"
+    release.set()
+    await in_flight
+    closed_at = await pause
+    assert client.disconnects == 1
+    assert closed_at < close_at - 4, "not kept open until the latest time"
+    await adapter.resume()

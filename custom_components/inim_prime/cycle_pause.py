@@ -23,6 +23,7 @@ from .adapters.native_adapter import NativeAdapter
 from .const import (
     NATIVE_CYCLE_PAUSE_AFTER_DEFAULT,
     NATIVE_CYCLE_PAUSE_BEFORE_DEFAULT,
+    NATIVE_CYCLE_PAUSE_CLOSE_WHEN_FREE,
     NATIVE_CYCLE_PAUSE_MAX,
     NATIVE_CYCLE_PAUSE_MIN,
     PERIODIC_DROP_PERIOD,
@@ -79,6 +80,7 @@ async def run_cycle_pause(adapter: NativeAdapter, before: float, after: float) -
                 close_at = instant - before,
                 # late rather than never, but never past the instant
                 idle_timeout = max(instant - 0.1 - time.time(), 0.1),
+                close_when_free = NATIVE_CYCLE_PAUSE_CLOSE_WHEN_FREE,
             )
             if closed_at is None:
                 _LOGGER.warning(
@@ -91,7 +93,7 @@ async def run_cycle_pause(adapter: NativeAdapter, before: float, after: float) -
                 late = closed_at - (instant - before)
                 _LOGGER.debug(
                     "Cycle pause: Native connection closed %.2fs before the "
-                    "panel's cycle (planned %.1fs), no new request from %.2fs "
+                    "panel's cycle (at the latest %.1fs), no new request from %.2fs "
                     "earlier (longest measured: %s), reopening %.1fs after it",
                     instant - closed_at, before, lead,
                     _seconds(adapter.longest_request), after,
