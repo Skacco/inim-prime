@@ -55,6 +55,7 @@ def build_native_schema(
         current_password: str | None = None,
         current_check_port_exposed: bool | None = None,
         current_port_check_server: str | None = None,
+        ask_port_check: bool = True,
 ) -> dict:
     """Build the native-protocol connection schema.
 
@@ -102,7 +103,10 @@ def build_native_schema(
         DataKey.Native.PIN,
     )] = TextSelector(TextSelectorConfig(type = TextSelectorType.PASSWORD))
 
-    # Check, when the form is submitted, that the port is not reachable from the Internet
+    # Check, when the form is submitted, that the port is not reachable from
+    # the Internet. First setup only: afterwards it is an entry of Configure.
+    if not ask_port_check:
+        return schema
     schema[vol.Required(
         DataKey.Native.CHECK_PORT_EXPOSED,
         default = (
@@ -155,6 +159,7 @@ def build_connection_schema(
         *,
         flow_data: ConfigData,
         prefill_secrets: bool = False,
+        ask_port_check: bool = True,
 ) -> dict:
     """Build the combined connection-step schema for the chosen backend(s).
 
@@ -174,6 +179,7 @@ def build_connection_schema(
                     build_native_schema(
                         require_password = True,
                         ask_outer_frame = not flow_data.use_primelan,
+                        ask_port_check = ask_port_check,
                     )
                 )
             )
@@ -191,6 +197,7 @@ def build_connection_schema(
                         require_password = prefill_secrets,
                         current_password = flow_data.native.password if prefill_secrets else None,
                         ask_outer_frame = not flow_data.use_primelan,
+                        ask_port_check = ask_port_check,
                     )
                 )
             )

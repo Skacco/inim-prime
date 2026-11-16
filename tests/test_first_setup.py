@@ -169,3 +169,53 @@ async def test_entry_with_the_cycle_pause_on_unloads(hass: HomeAssistant):
     assert await hass.config_entries.async_unload(entry.entry_id)
     await hass.async_block_till_done()
     assert entry.state is ConfigEntryState.NOT_LOADED
+
+
+async def test_port_check_is_an_entry_of_configure(hass: HomeAssistant, monkeypatch):
+    """Configure has a 'check Native port' entry: it shows the answer of the
+    checking service and goes back to the menu, changing nothing."""
+    from custom_components.inim_prime.flow import options_flow
+
+    native_handoff.keep(HOST, 6004, _FakeNativeClient())
+    entry = _native_entry(hass)
+    await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    stored = dict(entry.options)
+
+    asked = []
+
+    async def _reachable(_hass, server, port):
+        asked.append((server, port))
+        return False
+
+    monkeypatch.setattr(options_flow, "async_port_reachable", _reachable)
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    assert "port_check" in result["menu_options"]
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"next_step_id": "port_check"})
+    assert result["step_id"] == "port_check" and not asked, "nothing is asked before Submit"
+    result = await hass.config_entries.options.async_configure(result["flow_id"], {})
+    assert asked == [(None, 6004)]
+    assert result["step_id"] == "port_check_result"
+    assert "6004" in result["description_placeholders"]["result"]
+    result = await hass.config_entries.options.async_configure(result["flow_id"], {})
+    assert result["step_id"] == "init"
+    hass.config_entries.options.async_abort(result["flow_id"])
+    assert dict(entry.options) == stored
+    await hass.config_entries.async_unload(entry.entry_id)
+
+
+def test_port_check_asked_at_first_setup_only():
+    from custom_components.inim_prime.flow.models import ConfigData, NativeConfig
+    from custom_components.inim_prime.flow.schemas import build_connection_schema
+
+    data = ConfigData(host = HOST, use_native = True, use_primelan = False,
+                      native = NativeConfig(port = 6004, password = "x", use_outer_frame = False, pin = None))
+
+    def _fields(**kwargs):
+        native = build_connection_schema(flow_data = data, **kwargs)
+        section = next(value for key, value in native.items() if str(key) == "native")
+        return {str(key) for key in section.schema.schema}
+
+    assert {"check_port_exposed", "port_check_server"} <= _fields()
+    assert not {"check_port_exposed", "port_check_server"} & _fields(ask_port_check = False)

@@ -12,6 +12,7 @@ from homeassistant.helpers.selector import (
 )
 
 from .const import OptionsKey
+from ..port_exposure import async_port_reachable, port_check_result_text
 from ..const import SHUTTER_COMMAND_FIELDS
 from .models import ConfigOptions, extract_command_partitions
 from ..entry_data import get_entry_options, get_entry_data
@@ -95,6 +96,7 @@ class InimPrimeOptionsFlowHandler(OptionsFlowWithReload):
     """
 
     _cmd: str | None = None
+    _port_check_result: str = ""
     # In-memory working copy of the options; written to the entry only on
     # "Save and exit". Loaded from the stored options on first use.
     _loaded: bool = False
@@ -139,8 +141,33 @@ class InimPrimeOptionsFlowHandler(OptionsFlowWithReload):
         shutters, _ = self._shutter_context()
         if shutters:
             options.append("shutters")
+        if self._has_native:
+            options.append("port_check")
         options.append("save_exit")
         return self.async_show_menu(step_id="init", menu_options=options)
+
+    async def async_step_port_check(self, user_input: dict[str, Any] | None = None):
+        """Ask an external service whether the Native port can be reached
+        from the Internet. Changes nothing: the answer is shown, then back to
+        the menu."""
+        native = get_entry_data(self.config_entry).get("native") or {}
+        port = native.get("port")
+        if user_input is None:
+            return self.async_show_form(
+                step_id = "port_check", data_schema = vol.Schema({}),
+                description_placeholders = {"port": str(port)}, last_step = False,
+            )
+        reachable = await async_port_reachable(self.hass, native.get("port_check_server"), port)
+        self._port_check_result = port_check_result_text(self.hass, port, reachable)
+        return await self.async_step_port_check_result()
+
+    async def async_step_port_check_result(self, user_input: dict[str, Any] | None = None):
+        if user_input is not None:
+            return await self.async_step_init()
+        return self.async_show_form(
+            step_id = "port_check_result", data_schema = vol.Schema({}),
+            description_placeholders = {"result": self._port_check_result}, last_step = False,
+        )
 
     async def async_step_save_exit(self, user_input: dict[str, Any] | None = None):
         # The single write: persist the working copy, dropping empty alarm maps.

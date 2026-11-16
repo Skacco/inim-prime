@@ -251,6 +251,7 @@
           "scan": "Scan intervals",
           "alarm": "Alarm panel",
           "shutters": "Roller shutters",
+          "port_check": "🌐 Check Native port",
           "save_exit": "💾 Save and exit"
         }
       },
@@ -377,6 +378,14 @@
         "data": {
           "outputs": "Output activation"
         }
+      },
+      "port_check": {
+        "title": "Check Native port",
+        "description": "Asks an external service to try to reach the panel's Native port {port} from your public address, to make sure it is not exposed on the Internet. No setting is changed.\n\nPress Submit to run the check."
+      },
+      "port_check_result": {
+        "title": "Check Native port",
+        "description": "{result}\n\nPress Submit to go back to the menu."
       }
     },
     "error": {

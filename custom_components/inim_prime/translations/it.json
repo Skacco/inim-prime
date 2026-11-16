@@ -251,6 +251,7 @@
           "scan": "Intervalli di scansione",
           "alarm": "Pannello allarme",
           "shutters": "Tapparelle",
+          "port_check": "🌐 Controlla porta Native",
           "save_exit": "💾 Salva ed esci"
         }
       },
@@ -377,6 +378,14 @@
         "data": {
           "outputs": "Attivazione uscite"
         }
+      },
+      "port_check": {
+        "title": "Controlla porta Native",
+        "description": "Chiede a un servizio esterno di provare a raggiungere la porta Native {port} della centrale dal tuo indirizzo pubblico, per verificare che non sia esposta su Internet. Non cambia nessuna impostazione.\n\nPremi Invia per avviare il controllo."
+      },
+      "port_check_result": {
+        "title": "Controlla porta Native",
+        "description": "{result}\n\nPremi Invia per tornare al menu."
       }
     },
     "error": {

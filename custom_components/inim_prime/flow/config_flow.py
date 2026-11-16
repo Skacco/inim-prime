@@ -444,6 +444,9 @@ class InimPrimeConfigFlow(config_entries.ConfigFlow, domain = DOMAIN):
 
             if self._data.use_native:
 
+                previous_check_server = (
+                    self._data.native.port_check_server if self._data.native else None
+                )
                 native_conf = user_input[DataKey.NATIVE]
                 new_password = native_conf[DataKey.Native.PASSWORD] if native_conf.get(DataKey.Native.PASSWORD) is not None else self._data.native.password
                 new_pin = None
@@ -456,8 +459,9 @@ class InimPrimeConfigFlow(config_entries.ConfigFlow, domain = DOMAIN):
                     # With PrimeLAN configured the panel has a PrimeLAN card -> outer frame.
                     use_outer_frame = True if self._data.use_primelan else native_conf[DataKey.Native.USE_OUTER_FRAME],
                     pin = new_pin,
-                    check_port_exposed = bool(native_conf.get(DataKey.Native.CHECK_PORT_EXPOSED)),
-                    port_check_server = (native_conf.get(DataKey.Native.PORT_CHECK_SERVER) or "").strip() or None,
+                    # the port check is an entry of Configure now
+                    check_port_exposed = False,
+                    port_check_server = previous_check_server,
                 )
 
             if self._data.use_primelan:
@@ -478,6 +482,7 @@ class InimPrimeConfigFlow(config_entries.ConfigFlow, domain = DOMAIN):
         schema = vol.Schema(
             build_connection_schema(
                 flow_data = self._data,
+                ask_port_check = False,
             )
         )
 

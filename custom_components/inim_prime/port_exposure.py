@@ -64,3 +64,24 @@ async def async_port_reachable(hass: HomeAssistant, server: str | None, port: in
 def clear_port_exposed_notice(hass: HomeAssistant, entry_id: str) -> None:
     """Remove the repair notice an earlier build raised at start-up."""
     ir.async_delete_issue(hass, DOMAIN, _issue_id(entry_id))
+
+
+_RESULT_TEXTS = {
+    "it": {
+        False: "✅ La porta Native {port} non è raggiungibile da Internet.",
+        True: "⚠️ La porta Native {port} è raggiungibile da Internet: rimuovi l'inoltro di quella porta sul router.",
+        None: "❓ Controllo non riuscito: il servizio di verifica non ha risposto, quindi non si sa se la porta {port} è raggiungibile da Internet. Riprova più tardi.",
+    },
+    "en": {
+        False: "✅ Native port {port} cannot be reached from the Internet.",
+        True: "⚠️ Native port {port} can be reached from the Internet: remove the forwarding of that port on the router.",
+        None: "❓ Check failed: the checking service did not answer, so it is unknown whether port {port} can be reached from the Internet. Try again later.",
+    },
+}
+
+
+def port_check_result_text(hass: HomeAssistant, port, reachable: bool | None) -> str:
+    """The outcome of the check, in the language of Home Assistant."""
+    language = (getattr(hass.config, "language", None) or "en").split("-")[0]
+    texts = _RESULT_TEXTS.get(language, _RESULT_TEXTS["en"])
+    return texts[reachable].format(port = port)
