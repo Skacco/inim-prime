@@ -381,11 +381,17 @@
       },
       "port_check": {
         "title": "Controlla porta Native",
-        "description": "Chiede a un servizio esterno di provare a raggiungere la porta Native {port} della centrale dal tuo indirizzo pubblico, per verificare che non sia esposta su Internet. Non cambia nessuna impostazione.\n\nPremi Invia per avviare il controllo."
+        "description": "Chiede a un servizio esterno di provare a raggiungere la porta Native {port} della centrale dal tuo indirizzo pubblico, per verificare che non sia esposta su Internet. Non cambia nessuna impostazione.\n\nPremi «Prossimo» per avviare il controllo.",
+        "data": {
+          "port_check_server": "Servizio di verifica"
+        },
+        "data_description": {
+          "port_check_server": "Indirizzo del servizio che prova la porta (un server «echoip»). Viene ricordato per il prossimo controllo."
+        }
       },
       "port_check_result": {
         "title": "Controlla porta Native",
-        "description": "{result}\n\nPremi Invia per tornare al menu."
+        "description": "{result}\n\nPremi «Prossimo» per tornare al menu."
       }
     },
     "error": {

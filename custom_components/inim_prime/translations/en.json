@@ -381,11 +381,17 @@
       },
       "port_check": {
         "title": "Check Native port",
-        "description": "Asks an external service to try to reach the panel's Native port {port} from your public address, to make sure it is not exposed on the Internet. No setting is changed.\n\nPress Submit to run the check."
+        "description": "Asks an external service to try to reach the panel's Native port {port} from your public address, to make sure it is not exposed on the Internet. No setting is changed.\n\nPress «Next» to run the check.",
+        "data": {
+          "port_check_server": "Check service"
+        },
+        "data_description": {
+          "port_check_server": "Address of the service that tries the port (an \"echoip\" server). Remembered for the next check."
+        }
       },
       "port_check_result": {
         "title": "Check Native port",
-        "description": "{result}\n\nPress Submit to go back to the menu."
+        "description": "{result}\n\nPress «Next» to go back to the menu."
       }
     },
     "error": {

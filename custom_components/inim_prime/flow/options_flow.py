@@ -13,6 +13,8 @@ from homeassistant.helpers.selector import (
 
 from .const import OptionsKey
 from ..port_exposure import async_port_reachable, port_check_result_text
+from ..const import NATIVE_PORT_CHECK_SERVER_DEFAULT
+from homeassistant.helpers.selector import TextSelector, TextSelectorConfig, TextSelectorType
 from ..const import SHUTTER_COMMAND_FIELDS
 from .models import ConfigOptions, extract_command_partitions
 from ..entry_data import get_entry_options, get_entry_data
@@ -150,14 +152,28 @@ class InimPrimeOptionsFlowHandler(OptionsFlowWithReload):
         """Ask an external service whether the Native port can be reached
         from the Internet. Changes nothing: the answer is shown, then back to
         the menu."""
-        native = get_entry_data(self.config_entry).get("native") or {}
+        data = get_entry_data(self.config_entry)
+        native = dict(data.get("native") or {})
         port = native.get("port")
         if user_input is None:
             return self.async_show_form(
-                step_id = "port_check", data_schema = vol.Schema({}),
+                step_id = "port_check",
+                data_schema = vol.Schema({
+                    vol.Required(
+                        "port_check_server",
+                        default = native.get("port_check_server") or NATIVE_PORT_CHECK_SERVER_DEFAULT,
+                    ): TextSelector(TextSelectorConfig(type = TextSelectorType.URL)),
+                }),
                 description_placeholders = {"port": str(port)}, last_step = False,
             )
-        reachable = await async_port_reachable(self.hass, native.get("port_check_server"), port)
+        server = (user_input.get("port_check_server") or "").strip() or None
+        if server != native.get("port_check_server"):
+            # remembered for the next check; the connection is not touched
+            native["port_check_server"] = server
+            self.hass.config_entries.async_update_entry(
+                self.config_entry, data = {**self.config_entry.data, "native": native},
+            )
+        reachable = await async_port_reachable(self.hass, server, port)
         self._port_check_result = port_check_result_text(self.hass, port, reachable)
         return await self.async_step_port_check_result()
 

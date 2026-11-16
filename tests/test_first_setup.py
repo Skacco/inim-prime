@@ -194,8 +194,10 @@ async def test_port_check_is_an_entry_of_configure(hass: HomeAssistant, monkeypa
     result = await hass.config_entries.options.async_configure(
         result["flow_id"], {"next_step_id": "port_check"})
     assert result["step_id"] == "port_check" and not asked, "nothing is asked before Submit"
-    result = await hass.config_entries.options.async_configure(result["flow_id"], {})
-    assert asked == [(None, 6004)]
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"port_check_server": "https://echoip.example"})
+    assert asked == [("https://echoip.example", 6004)]
+    assert entry.data["native"]["port_check_server"] == "https://echoip.example", "remembered"
     assert result["step_id"] == "port_check_result"
     assert "6004" in result["description_placeholders"]["result"]
     result = await hass.config_entries.options.async_configure(result["flow_id"], {})
