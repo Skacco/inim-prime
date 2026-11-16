@@ -46,9 +46,8 @@ PERIODIC_DROP_TOLERANCE = 5.0
 # connection is open then: with Native, the connection is closed shortly
 # before each instant and reopened shortly after (seconds). Measured on two
 # Prime panels: closing up to 3s ahead and reopening from 0.5s after was clean.
-# at the latest: on a panel with slow reads it closes earlier by itself, on
-# a fast one right at this time (0.7s: two drops were seen closing ~0.7s ahead
-# with 0.5 set, none with 1.0)
+# Closed exactly this long before the instant, on any panel (clean cycles
+# were seen closing 0.6-1.2s ahead).
 NATIVE_CYCLE_PAUSE_BEFORE = 0.7
 NATIVE_CYCLE_PAUSE_AFTER = 0.5
 # The connection is closed exactly the configured time before the instant,
@@ -63,7 +62,7 @@ NATIVE_CYCLE_PAUSE_LEAD_MAX = 3.0
 # so anywhere between the moment the requests stop and the configured time
 # (the configured time is then the latest it can be closed at). False: it
 # stays open and idle until the configured time and is closed exactly then.
-NATIVE_CYCLE_PAUSE_CLOSE_WHEN_FREE = True
+NATIVE_CYCLE_PAUSE_CLOSE_WHEN_FREE = False
 # The lead is taken from this share of the measured requests: a rare slow one
 # does not lengthen every pause (it is waited for, and reported, when it
 # happens to be running at the planned time).

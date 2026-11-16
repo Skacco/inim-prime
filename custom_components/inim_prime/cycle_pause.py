@@ -91,7 +91,7 @@ async def run_cycle_pause(adapter: NativeAdapter, before: float, after: float) -
                 late = closed_at - (instant - before)
                 _LOGGER.debug(
                     "Cycle pause: Native connection closed %.2fs before the "
-                    "panel's cycle (at the latest %.1fs), no new request from %.2fs "
+                    "panel's cycle (planned %.1fs), no new request from %.2fs "
                     "earlier (longest measured: %s), reopening %.1fs after it",
                     instant - closed_at, before, lead,
                     _longest(adapter), after,

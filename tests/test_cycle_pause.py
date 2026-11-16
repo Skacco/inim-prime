@@ -185,9 +185,8 @@ async def test_cycle_task_closes_before_and_reopens_after(monkeypatch):
     client.disconnect, client.connect = _disconnect, _connect
     with pytest.raises(asyncio.CancelledError):
         await cp.run_cycle_pause(adapter, before = 2.0, after = 3.0)
-    # nothing in flight: closed as soon as the requests are stopped, the
-    # head start (0.6 s, nothing measured yet) ahead of the latest time
-    assert events == [("closed", -2.6), ("opened", 3.0)]
+    # closed exactly `before` ahead and reopened exactly `after` past it
+    assert events == [("closed", -2.0), ("opened", 3.0)]
 
 
 async def test_pause_waits_only_for_the_request_in_flight_not_for_the_queue():
@@ -422,5 +421,6 @@ async def test_lead_is_worked_out_just_before_the_pause(monkeypatch):
     client.disconnect, client.connect = _disconnect, _connect
     with pytest.raises(asyncio.CancelledError):
         await cp.run_cycle_pause(adapter, before = 0.5, after = 1.0)
-    # requests stopped 0.5 + 1.0 * 1.2 + 0.1 = 1.8 s ahead, closed at once (nothing in flight)
-    assert events == [1.8]
+    # requests stopped 0.5 + 1.0 * 1.2 + 0.1 = 1.8 s ahead (the slower
+    # measure), then the connection is closed exactly 0.5 s ahead
+    assert events == [0.5]
