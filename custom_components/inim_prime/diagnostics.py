@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from homeassistant.components.diagnostics import async_redact_data
 from homeassistant.helpers.device_registry import DeviceEntry
 
 from .entry_data import get_entry_data
@@ -10,6 +11,9 @@ from .const import (
 )
 from .runtime_data import InimPrimeConfigEntry
 from .gateway import InimPrimeGateway
+
+# Options left out of the download: PINs and passwords.
+_REDACTED_OPTIONS = {"alarm_pin", "pin", "password"}
 
 
 async def async_get_config_entry_diagnostics(
@@ -31,10 +35,10 @@ async def async_get_config_entry_diagnostics(
             "state": zone.state.name if zone.state is not None else None,
             "bypass": zone.bypass,
             "alarm_memory": zone.alarm_memory,
-            "native_status_bytes": zone.native_status_bytes,
+            "native_status_bytes": zone.native_status_bytes.hex(" ") if zone.native_status_bytes is not None else None,
             "native_state_str": zone.native_state_str,
         }
-        for zone_id, zone in gateway.zones
+        for zone_id, zone in gateway.zones.items()
     }, "partitions": {
         partition_id: {
             "id": partition.partition_id,
@@ -43,8 +47,17 @@ async def async_get_config_entry_diagnostics(
             "arming_status": partition.arming_status.name if partition.arming_status is not None else None,
             "alarm_memory": partition.alarm_memory,
         }
-        for partition_id, partition in gateway.partitions
+        for partition_id, partition in gateway.partitions.items()
     }}
+    # How the options map the alarm panels' modes to areas and scenarios:
+    # needed to tell why a state shows as armed with custom bypass.
+    diagnostics["options"] = async_redact_data(dict(entry.options), _REDACTED_OPTIONS)
+    scenarios = gateway.scenarios
+    if scenarios is not None:
+        diagnostics["scenarios"] = {
+            scenario_id: {"label": scenario.label, "active": scenario.active}
+            for scenario_id, scenario in scenarios.items()
+        }
     system_faults = gateway.system_faults
     if system_faults is not None:
         diagnostics["system_faults"] = {
@@ -90,7 +103,7 @@ async def async_get_device_diagnostics(
                         "state": zone.state.name if zone.state is not None else None,
                         "bypass": zone.bypass,
                         "alarm_memory": zone.alarm_memory,
-                        "native_status_bytes": zone.native_status_bytes,
+                        "native_status_bytes": zone.native_status_bytes.hex(" ") if zone.native_status_bytes is not None else None,
                         "native_state_str": zone.native_state_str,
                     }
 
