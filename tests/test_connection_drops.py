@@ -60,11 +60,14 @@ async def test_action_lists_recorded_drops_newest_first(recorder_mock, hass):
         DOMAIN, cd.SERVICE_CONNECTION_DROPS, {}, blocking = True, return_response = True,
     )
 
-    assert answer["totale"] == 2
-    assert sorted((d["connessione"], d["durata_secondi"]) for d in answer["cadute"]) == [
-        ("Native", 8.3), ("PrimeLAN", 12.2),
-    ]
-    assert set(answer["cadute"][0]) == {"connessione", "inizio", "durata_secondi", "periodica"}
+    # the two connections of the panel dropped together: one drop
+    assert answer["totale"] == 1
+    assert answer["cadute"] == [{
+        "inizio": answer["cadute"][0]["inizio"],
+        "periodica": answer["cadute"][0]["periodica"],
+        "native_secondi": 8.3,
+        "primelan_secondi": 12.2,
+    }]
     assert set(answer) == {"dal", "al", "totale", "periodiche", "altre", "cadute"}
 
     # the default is one day back
@@ -74,17 +77,42 @@ async def test_action_lists_recorded_drops_newest_first(recorder_mock, hass):
     answer = await hass.services.async_call(
         DOMAIN, cd.SERVICE_CONNECTION_DROPS, {"days": 3}, blocking = True, return_response = True,
     )
-    assert answer["totale"] == 2
+    assert answer["totale"] == 1
     span = datetime.fromisoformat(answer["al"]) - datetime.fromisoformat(answer["dal"])
     assert span == timedelta(days = 3)
 
 
-def test_counts_per_kind_and_connection():
-    def _drop(connection, periodic):
-        return {"connessione": connection, "periodica": periodic}
+def _raw(connection, at, duration, panel = "SERIAL"):
+    from datetime import datetime, timedelta, timezone
+    start = datetime(2026, 11, 17, 17, 4, 35, tzinfo = timezone.utc) + timedelta(seconds = at)
+    return {
+        "connessione": connection, "inizio": start.isoformat(), "durata_secondi": duration,
+        "periodica": False, "_start": start, "_panel": panel,
+    }
 
+
+def test_drops_of_the_two_connections_close_together_are_one():
+    both = {"SERIAL": {"Native", "PrimeLAN"}}
+    grouped = cd.group_drops([
+        _raw("PrimeLAN", 5, 11.6), _raw("Native", 0, 7.7),        # one drop of the panel
+        _raw("Native", 3600, 9.3),                                  # Native only
+    ], both)
+    assert [{k: v for k, v in d.items() if k not in ("inizio",)} for d in grouped] == [
+        {"periodica": False, "native_secondi": 9.3, "_only": "Native"},
+        {"periodica": False, "native_secondi": 7.7, "primelan_secondi": 11.6},
+    ]
+    assert cd._count(grouped) == "2 (solo Native 1)"
+    assert cd._count(grouped[1:]) == 1
     assert cd._count([]) == 0
-    assert cd._count([_drop("Native", False)] * 4) == "4 (Native 4)"
-    assert cd._count(
-        [_drop("Native", True), _drop("PrimeLAN", True), _drop("Native", True)]
-    ) == "3 (Native 2, PrimeLAN 1)"
+
+
+def test_native_only_panel_is_not_marked_as_one_connection_only():
+    grouped = cd.group_drops([_raw("Native", 0, 8.0), _raw("Native", 4000, 8.1)],
+                             {"SERIAL": {"Native"}})
+    assert cd._count(grouped) == 2
+
+
+def test_drops_of_two_panels_are_not_merged():
+    both = {"A": {"Native", "PrimeLAN"}, "B": {"Native", "PrimeLAN"}}
+    grouped = cd.group_drops([_raw("Native", 0, 8.0, "A"), _raw("PrimeLAN", 2, 9.0, "B")], both)
+    assert len(grouped) == 2

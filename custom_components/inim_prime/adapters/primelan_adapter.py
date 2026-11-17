@@ -10,7 +10,12 @@ from __future__ import annotations
 from dataclasses import replace
 
 import asyncio
+import contextvars
+import inspect
 import logging
+import math
+import time
+from collections import deque
 from types import MappingProxyType
 
 import aiohttp
@@ -157,14 +162,24 @@ def _scenario_to_unified(scenario: PrimelanScenarioStatus) -> UnifiedScenario:
 
 
 from ..const import (
+    NATIVE_CYCLE_PAUSE_LEAD_FACTOR,
+    NATIVE_CYCLE_PAUSE_LEAD_MARGIN,
+    NATIVE_CYCLE_PAUSE_LEAD_MAX,
+    NATIVE_CYCLE_PAUSE_LEAD_MIN,
+    NATIVE_CYCLE_PAUSE_LEAD_PERCENTILE,
     PRIMELAN_COMMAND_RETRY_INTERVAL,
     PRIMELAN_COMMAND_RETRY_WINDOW,
+    PRIMELAN_REQUEST_DURATIONS_KEPT,
 )
 
 _LOGGER = logging.getLogger(__name__)
 
 # Indirection so tests can skip the waits.
 _sleep = asyncio.sleep
+
+# Set while the adapter itself reopens the client after a pause: its own
+# check request must not wait for the pause to end.
+_REOPENING: contextvars.ContextVar[bool] = contextvars.ContextVar("primelan_reopening", default = False)
 
 
 class PrimelanAdapter:
@@ -180,6 +195,11 @@ class PrimelanAdapter:
         "_gsm",
         "_system_faults",
         "_held_commands",
+        "_open",
+        "_in_flight",
+        "_idle",
+        "_paused",
+        "_request_durations",
     )
 
     def __init__(self, client: InimPrimeClient) -> None:
@@ -197,6 +217,41 @@ class PrimelanAdapter:
         self._system_faults: UnifiedSystemFaults | None = None
         # Commands currently waiting for the panel to accept connections again.
         self._held_commands: set = set()
+        # Cycle pause: while _open is clear no new request is sent (they wait),
+        # and the client's connections are closed once the last one has ended.
+        self._open = asyncio.Event()
+        self._open.set()
+        self._in_flight = 0
+        self._idle = asyncio.Event()
+        self._idle.set()
+        self._paused = False
+        # (command, seconds) of the last requests, for the pause's lead
+        self._request_durations: deque[tuple[str, float]] = deque(maxlen = PRIMELAN_REQUEST_DURATIONS_KEPT)
+        request = getattr(client, "_request", None)
+
+        async def _request(*args, **kwargs):
+            if not _REOPENING.get():
+                await self._open.wait()
+            self._in_flight += 1
+            self._idle.clear()
+            started = time.monotonic()
+            try:
+                # looked up at every call (not the one bound at start), so a
+                # replacement of the client's method is still honoured
+                original = getattr(type(client), "_request")
+                if inspect.isfunction(original):
+                    return await original(client, *args, **kwargs)
+                return await original(*args, **kwargs)
+            finally:
+                kind = str(kwargs.get("cmd", args[0] if args else "other"))
+                self._request_durations.append((kind, time.monotonic() - started))
+                self._in_flight -= 1
+                if self._in_flight == 0:
+                    self._idle.set()
+
+        # every PrimeLAN request goes through the client's _request
+        if inspect.iscoroutinefunction(request):
+            client._request = _request
 
     async def _send_command(self, coro_factory, key):
         """Send a command, retrying while the panel refuses the connection.
@@ -249,6 +304,86 @@ class PrimelanAdapter:
 
     async def close(self) -> None:
         await self._client.close()
+
+    # ------------------------------------------------------------------
+    # Cycle pause
+    # ------------------------------------------------------------------
+    @property
+    def paused(self) -> bool:
+        return self._paused
+
+    @property
+    def longest_request_by_kind(self) -> dict[str, float]:
+        """Longest recently measured request of each command, slowest first."""
+        longest: dict[str, float] = {}
+        for kind, duration in self._request_durations:
+            if duration > longest.get(kind, 0.0):
+                longest[kind] = duration
+        return dict(sorted(longest.items(), key = lambda item: -item[1]))
+
+    @property
+    def typical_longest_request(self) -> float | None:
+        """Duration that NATIVE_CYCLE_PAUSE_LEAD_PERCENTILE of the recently
+        measured requests do not exceed (seconds), if any."""
+        if not self._request_durations:
+            return None
+        durations = sorted(duration for _, duration in self._request_durations)
+        index = max(math.ceil(len(durations) * NATIVE_CYCLE_PAUSE_LEAD_PERCENTILE) - 1, 0)
+        return durations[index]
+
+    @property
+    def request_lead(self) -> float:
+        """How long before the planned close no new request should be sent:
+        measured on this panel like Native's. Until a request has been
+        measured, the longest lead allowed."""
+        typical = self.typical_longest_request
+        if typical is None:
+            return NATIVE_CYCLE_PAUSE_LEAD_MAX
+        lead = typical * NATIVE_CYCLE_PAUSE_LEAD_FACTOR + NATIVE_CYCLE_PAUSE_LEAD_MARGIN
+        return min(max(lead, NATIVE_CYCLE_PAUSE_LEAD_MIN), NATIVE_CYCLE_PAUSE_LEAD_MAX)
+
+    async def pause(self, close_at: float, latest: float) -> tuple[float, int]:
+        """Stop sending requests now and close the client's connections at
+        close_at (wall-clock time), or as soon as the requests in flight have
+        ended if that is later, but not after latest: a request still running
+        then is cut. Until resume() the requests wait.
+
+        Returns the wall-clock time the connections were closed at and how
+        many requests were still in flight at close_at."""
+        self._paused = True
+        self._open.clear()
+        while (remaining := close_at - time.time()) > 0:
+            await asyncio.sleep(min(remaining, 0.5))
+        in_flight = self._in_flight
+        try:
+            await asyncio.wait_for(self._idle.wait(), max(latest - time.time(), 0.0))
+        except TimeoutError:
+            pass
+        # also the idle kept-alive connections: none may be open at the instant
+        await self._client.close()
+        return time.time(), in_flight
+
+    def release(self) -> None:
+        """End the pause without reopening (the integration is unloading)."""
+        self._paused = False
+        self._open.set()
+
+    async def resume(self) -> bool:
+        """Reopen the client and let the requests go on. False when the panel
+        did not answer the check request (the requests then retry as usual)."""
+        if not self._paused:
+            return True
+        token = _REOPENING.set(True)
+        try:
+            await self._client.connect()
+            return True
+        except Exception as err:  # noqa: BLE001 - the panel may be restarting
+            _LOGGER.debug("PrimeLAN check after the pause failed (%s)", err)
+            return False
+        finally:
+            _REOPENING.reset(token)
+            self._paused = False
+            self._open.set()
 
     # ------------------------------------------------------------------
     #   Properties

@@ -424,3 +424,106 @@ async def test_lead_is_worked_out_just_before_the_pause(monkeypatch):
     # requests stopped 0.5 + 1.0 * 1.2 + 0.1 = 1.8 s ahead (the slower
     # measure), then the connection is closed exactly 0.5 s ahead
     assert events == [0.5]
+
+
+class _PrimelanClient:
+    """Fake PrimeLAN client: requests go through _request, like the real one."""
+
+    def __init__(self):
+        self.session = True
+        self.connects = 0
+        self.closes = 0
+        self.requests = []
+        self.release = asyncio.Event()
+        self.release.set()
+
+    async def _request(self, cmd, **params):
+        assert self.session, f"{cmd} sent with the connections closed"
+        self.requests.append(cmd)
+        await self.release.wait()
+        return {}
+
+    async def connect(self):
+        self.connects += 1
+        self.session = True
+        await self._request("ping")
+
+    async def close(self):
+        self.closes += 1
+        self.session = False
+
+
+async def test_primelan_pause_holds_requests_and_closes_after_the_one_in_flight():
+    from custom_components.inim_prime.adapters import primelan_adapter as pa
+    import time
+
+    client = _PrimelanClient()
+    adapter = pa.PrimelanAdapter(client)
+    client.release.clear()
+    in_flight = asyncio.create_task(client._request("get_scenarios_status"))
+    await asyncio.sleep(0)
+
+    pause = asyncio.create_task(adapter.pause(close_at = time.time(), latest = time.time() + 5))
+    await asyncio.sleep(0)
+    held = asyncio.create_task(client._request("get_gsm_status"))
+    await asyncio.sleep(0.05)
+    assert client.requests == ["get_scenarios_status"] and client.closes == 0
+
+    client.release.set()          # the one in flight ends: then the connections close
+    closed_at, still_running = await pause
+    await in_flight
+    assert client.closes == 1 and still_running == 1
+    assert not held.done(), "a new request must wait for the pause to end"
+
+    assert await adapter.resume()
+    await held
+    # reopened with its own check request first, then the held one
+    assert client.requests == ["get_scenarios_status", "ping", "get_gsm_status"]
+    assert not adapter.paused
+
+
+async def test_cycle_task_pauses_primelan_with_native(monkeypatch):
+    from custom_components.inim_prime.adapters import primelan_adapter as pa
+
+    adapter, client = _adapter()
+    primelan_client = _PrimelanClient()
+    primelan = pa.PrimelanAdapter(primelan_client)
+    clock = {"now": cp.next_cycle_instant(1_794_000_000.0) - 100.0}
+    instant = cp.next_cycle_instant(clock["now"])
+    events = []
+    real_sleep = asyncio.sleep
+
+    async def _sleep(seconds):
+        clock["now"] += seconds
+        await real_sleep(0)
+
+    monkeypatch.setattr(cp.time, "time", lambda: clock["now"])
+    monkeypatch.setattr(cp.asyncio, "sleep", _sleep)
+    close, connect = primelan_client.close, primelan_client.connect
+
+    async def _close():
+        events.append(("primelan closed", round(clock["now"] - instant, 1)))
+        await close()
+
+    async def _connect():
+        events.append(("primelan opened", round(clock["now"] - instant, 1)))
+        await connect()
+        raise asyncio.CancelledError   # one cycle is enough
+
+    primelan_client.close, primelan_client.connect = _close, _connect
+    with pytest.raises(asyncio.CancelledError):
+        await cp.run_cycle_pause(adapter, before = 0.7, after = 0.5, primelan = primelan)
+    assert events == [("primelan closed", -0.7), ("primelan opened", 0.5)]
+
+
+async def test_primelan_lead_is_measured_on_its_requests():
+    from custom_components.inim_prime.adapters import primelan_adapter as pa
+    from custom_components.inim_prime.const import NATIVE_CYCLE_PAUSE_LEAD_MAX
+
+    adapter = pa.PrimelanAdapter(_PrimelanClient())
+    # nothing measured yet: the longest lead allowed
+    assert adapter.request_lead == NATIVE_CYCLE_PAUSE_LEAD_MAX
+    adapter._request_durations.extend([("get_scenarios_status", 0.5)] * 99 + [("get_gsm_status", 2.0)])
+    # 98% within 0.5 s: 0.5 * 1.2 + 0.1, the rare slow one left out
+    assert adapter.request_lead == pytest.approx(0.7)
+    assert list(adapter.longest_request_by_kind) == ["get_gsm_status", "get_scenarios_status"]

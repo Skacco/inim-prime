@@ -401,7 +401,7 @@
   "services": {
     "connection_drops": {
       "name": "Connection drops",
-      "description": "Lists the connection drops to the panel found in the recorded history: connection (Native or PrimeLAN), start time, duration and whether they fall on the panel's periodic restart of its network.",
+      "description": "Lists the connection drops to the panel found in the recorded history: start time, duration of each connection that dropped (Native, PrimeLAN) and whether they fall on the panel's periodic restart of its network. The two connections dropping together count as one drop.",
       "fields": {
         "days": {
           "name": "Days",

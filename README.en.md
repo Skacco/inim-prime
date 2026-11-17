@@ -265,7 +265,7 @@ data:
   days: 2
 ```
 
-The answer has `dal`, `al`, `totale`, `periodiche` and `altre` (for example `2 (Native 1, PrimeLAN 1)`) and the `cadute` list, each with `connessione`, `inizio`, `durata_secondi` and `periodica`. The history covers what Home Assistant's recorder keeps (10 days by default).
+The answer has `dal`, `al`, `totale`, `periodiche` and `altre` and the `cadute` list, each with `inizio`, `periodica` and the duration of each connection that dropped (`native_secondi`, `primelan_secondi`). When the panel restarts its network Native and PrimeLAN drop together: that counts as one drop. When only one of the two dropped, the totals say so in brackets (for example `2 (solo Native 1)`). The history covers what Home Assistant's recorder keeps (10 days by default).
 
 
 # Recommended configuration

@@ -23,6 +23,10 @@ MAX_DAYS = 365
 # The history is read one slice at a time: the sensors write a row a minute,
 # so a year in one query would load about a million states at once.
 _SLICE = timedelta(days = 1)
+# Drops of the two connections of one panel starting this close together are
+# one drop of the panel (it restarts its network: every connection goes). The
+# second one is noticed at its next read, so a few seconds later.
+_SAME_DROP = timedelta(seconds = 30)
 
 CONNECTION_DROPS_SCHEMA = vol.Schema({
     vol.Optional("days", default = 1): vol.All(vol.Coerce(int), vol.Range(min = 1, max = MAX_DAYS)),
@@ -35,15 +39,15 @@ _CONNECTIONS = {
 }
 
 
-def _connectivity_entities(hass: HomeAssistant) -> dict[str, str]:
-    """entity_id -> connection name, for the connectivity sensors of every panel."""
-    found: dict[str, str] = {}
+def _connectivity_entities(hass: HomeAssistant) -> dict[str, tuple[str, str]]:
+    """entity_id -> (panel, connection name), for the connectivity sensors of every panel."""
+    found: dict[str, tuple[str, str]] = {}
     for entry in er.async_get(hass).entities.values():
         if entry.platform != DOMAIN or entry.domain != "binary_sensor":
             continue
         for suffix, name in _CONNECTIONS.items():
             if entry.unique_id.endswith(suffix):
-                found[entry.entity_id] = name
+                found[entry.entity_id] = (entry.unique_id[:-len(suffix)], name)
     return found
 
 
@@ -93,34 +97,77 @@ async def _connection_drops(hass: HomeAssistant, call: ServiceCall) -> ServiceRe
                 significant_changes_only = False,
             )
         )
-        for entity_id, connection in entities.items():
+        for entity_id, (panel, connection) in entities.items():
             for drop in extract_drops(recorded.get(entity_id, []), connection):
-                found[(connection, drop["inizio"])] = drop
+                drop["_panel"] = panel
+                found[(panel, connection, drop["inizio"])] = drop
         slice_start = slice_end
 
-    drops = [drop for drop in found.values() if drop["_start"] >= start]
-    drops.sort(key = lambda drop: drop["_start"], reverse = True)
-    for drop in drops:
-        del drop["_start"]
+    connections: dict[str, set[str]] = {}
+    for panel, connection in entities.values():
+        connections.setdefault(panel, set()).add(connection)
+    drops = group_drops([drop for drop in found.values() if drop["_start"] >= start], connections)
     return {
         "dal": dt_util.as_local(start).isoformat(timespec = "seconds"),
         "al": dt_util.as_local(end).isoformat(timespec = "seconds"),
         "totale": len(drops),
         "periodiche": _count([drop for drop in drops if drop["periodica"]]),
         "altre": _count([drop for drop in drops if not drop["periodica"]]),
-        "cadute": drops,
+        "cadute": [{k: v for k, v in drop.items() if not k.startswith("_")} for drop in drops],
     }
 
 
+def group_drops(
+        drops: list[dict[str, Any]],
+        connections: dict[str, set[str]] | None = None,
+) -> list[dict[str, Any]]:
+    """One entry per drop of a panel, newest first: the drops of its connections
+    starting within _SAME_DROP of each other are one, with each one's duration.
+    On a panel with both connections, a drop that hit one only is marked."""
+    drops = sorted(drops, key = lambda drop: drop["_start"])
+    grouped: list[dict[str, Any]] = []
+    open_by_panel: dict[str, dict[str, Any]] = {}
+    for drop in drops:
+        key = f"{drop['connessione'].lower()}_secondi"
+        current = open_by_panel.get(drop.get("_panel", ""))
+        if (
+            current is not None
+            and drop["_start"] - current["_start"] <= _SAME_DROP
+            and key not in current
+        ):
+            current[key] = drop["durata_secondi"]
+            continue
+        current = {
+            "inizio": drop["inizio"],
+            "periodica": drop["periodica"],
+            key: drop["durata_secondi"],
+            "_start": drop["_start"],
+            "_panel": drop.get("_panel", ""),
+        }
+        open_by_panel[drop.get("_panel", "")] = current
+        grouped.append(current)
+    grouped.sort(key = lambda drop: drop["_start"], reverse = True)
+    for drop in grouped:
+        del drop["_start"]
+        hit = [name for name in _CONNECTIONS.values() if f"{name.lower()}_secondi" in drop]
+        panel_connections = (connections or {}).get(drop.pop("_panel"), set())
+        if len(hit) == 1 and len(panel_connections) > 1:
+            drop["_only"] = hit[0]
+    return grouped
+
+
 def _count(drops: list[dict[str, Any]]) -> int | str:
-    """How many, then how many per connection: 0, or "3 (Native 2, PrimeLAN 1)"."""
+    """How many, and how many of them hit one connection only:
+    0, 3, or "3 (solo Native 1)"."""
     if not drops:
         return 0
-    per_connection = [
-        f"{name} {count}" for name in _CONNECTIONS.values()
-        if (count := sum(drop["connessione"] == name for drop in drops))
+    only = [
+        f"solo {name} {count}" for name in _CONNECTIONS.values()
+        if (count := sum(drop.get("_only") == name for drop in drops))
     ]
-    return f"{len(drops)} ({', '.join(per_connection)})"
+    if not only:
+        return len(drops)
+    return f"{len(drops)} ({', '.join(only)})"
 
 
 def async_register(hass: HomeAssistant) -> None:

@@ -71,6 +71,9 @@ NATIVE_CYCLE_PAUSE_LEAD_PERCENTILE = 0.98
 NATIVE_CYCLE_PAUSE_LEAD_DEFAULT = 0.6
 # Requests whose duration is remembered for the measure (a few minutes' worth).
 NATIVE_REQUEST_DURATIONS_KEPT = 2000
+# PrimeLAN requests whose duration is remembered for its pause's lead
+# (they are fewer than Native's: a few every ten seconds).
+PRIMELAN_REQUEST_DURATIONS_KEPT = 500
 
 # Native defaults
 NATIVE_PORT_DEFAULT: Final[int] = inim.prime.native.const.Panel.DEFAULT_PORT

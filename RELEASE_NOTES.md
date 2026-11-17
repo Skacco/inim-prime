@@ -1,11 +1,11 @@
 ## Novità 1.2.0
 
-- **Riavvio periodico della centrale**: con la connessione Native, l'integrazione chiude la connessione per circa un secondo attorno al riavvio periodico della rete della centrale (ogni ~71,6 minuti), che così non fa più cadere le connessioni.
+- **Riavvio periodico della centrale**: con la connessione Native, l'integrazione chiude le sue connessioni (anche PrimeLAN, se configurata) per circa un secondo attorno al riavvio periodico della rete della centrale (ogni ~71,6 minuti), che così non fa più cadere le connessioni.
 - **Manutenzione interna**: adeguamenti ai controlli di validazione di Home Assistant e HACS.
 - **Pacchetto di installazione**: l'integrazione viene ora distribuita da HACS come pacchetto unico allegato alla release.
 - **Zone doppie con firmware 4**: l'esclusione della seconda zona ora funziona anche con firmware 4.
 - **Password di connessione rifiutata**: se la centrale non accetta la password della connessione Native, l'integrazione smette di riprovare e mostra un avviso in Riparazioni (ogni tentativo fa cadere le connessioni locali della centrale per una decina di secondi).
-- **Cadute di connessione**: nuova azione «Cadute di connessione», che elenca le cadute registrate nello storico con connessione, ora di inizio e durata.
+- **Cadute di connessione**: nuova azione «Cadute di connessione», che elenca le cadute registrate nello storico con ora di inizio e durata di ogni connessione; Native e PrimeLAN cadute insieme contano come una sola caduta.
 - **Scarica diagnostica**: il download della diagnostica dell'integrazione dava errore; ora funziona e include anche le modalità del pannello allarme e gli scenari (senza PIN).
 - **Controllo porta esposta**: verifica se la porta Native della centrale è raggiungibile da Internet. All'installazione è un'opzione del modulo, che in caso si ferma con un avviso; dopo, una voce di Configura che mostra il risultato.
 

@@ -126,6 +126,10 @@ class InimPrimeGateway:
         return self._native
 
     @property
+    def primelan_adapter(self) -> PrimelanAdapter | None:
+        return self._primelan
+
+    @property
     def timers(self) -> MappingProxyType[int, UnifiedTimer] | None:
         """Timers with a custom name (the default "TIMER 0xx" ones are unused)."""
         if self._native is None:

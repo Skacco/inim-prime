@@ -221,7 +221,7 @@ L'integrazione raggruppa le entità in pochi dispositivi.
 Rappresenta la centrale.
 - **Sensori:** Zone escluse, Memorie allarme zone, Memorie allarme aree, Scenario attivo.
 - **Diagnostica:** Tensione alimentazione, i sensori di **guasto** (Batteria scarica, Guasto rete, Linea telefonica assente, Disturbo radio, Sabotaggio, Guasto GSM, Guasto Internet, ecc.) e i sensori di **connessione** per modalità di integrazione (**Connessione Native** e/o **Connessione PrimeLAN**, `connectivity`): accesi quando l'ultimo polling della modalità è andato a buon fine, con l'attributo `ultimo_ok` (aggiornato al massimo una volta al minuto). Hanno anche due attributi a solo scopo diagnostico, `ultima_caduta` e `durata_ultima_caduta` (in secondi): è normale vederli aggiornati spesso, vedi la nota qui sotto. Ne compare uno per ogni modalità configurata — due se usi entrambi.
-- **Nota sulle cadute di connessione:** ogni ~71,6 minuti la centrale può riavviare le proprie connessioni di rete per circa 11 secondi, se in quel momento è aperta una connessione Native. L'integrazione chiude la connessione per circa un secondo attorno a quegli istanti per evitarlo, mantenendo comunque stati e comandi.
+- **Nota sulle cadute di connessione:** ogni ~71,6 minuti la centrale può riavviare le proprie connessioni di rete per circa 11 secondi, se in quel momento è aperta una connessione. L'integrazione chiude le sue connessioni (Native e, se configurata, PrimeLAN) per circa un secondo attorno a quegli istanti per evitarlo, mantenendo comunque stati e comandi.
 - **Registro eventi** (event entity): traccia i log della centrale. Non è in tempo reale (vedi sezione sulla card del registro).
 - **Pulsanti:** Annulla esclusioni zone, Cancella memorie aree, e i pulsanti degli **scenari**.
 - **Allarme** (`alarm_control_panel`): inserimento/disinserimento guidato dagli scenari (se configurato nelle opzioni).
@@ -266,7 +266,7 @@ data:
   days: 2
 ```
 
-La risposta contiene `dal`, `al`, `totale`, `periodiche` e `altre` (per esempio `2 (Native 1, PrimeLAN 1)`) e l'elenco `cadute`, ognuna con `connessione`, `inizio`, `durata_secondi` e `periodica`. Lo storico copre il periodo conservato dal registratore di Home Assistant (di default 10 giorni).
+La risposta contiene `dal`, `al`, `totale`, `periodiche` e `altre` e l'elenco `cadute`, ognuna con `inizio`, `periodica` e la durata di ogni connessione caduta (`native_secondi`, `primelan_secondi`). Quando la centrale riavvia la rete cadono insieme Native e PrimeLAN: conta come una sola caduta. Se è caduta una sola delle due connessioni, i totali lo indicano tra parentesi (per esempio `2 (solo Native 1)`). Lo storico copre il periodo conservato dal registratore di Home Assistant (di default 10 giorni).
 
 
 # Configurazione consigliata

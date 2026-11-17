@@ -435,7 +435,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: InimPrimeConfigEntry) ->
     # the port check now runs only in the connection form
     clear_port_exposed_notice(hass, entry.entry_id)
     _setup_realtime_webhook(hass, entry)
-    setup_cycle_pause(hass, entry, inim_gateway.native_adapter)
+    setup_cycle_pause(hass, entry, inim_gateway.native_adapter, inim_gateway.primelan_adapter)
     _remove_stale_output_entities(hass, entry, inim_gateway)
     _remove_stale_timer_entities(hass, entry, inim_gateway)
     _remove_hidden_partition_entities(hass, entry, inim_gateway)

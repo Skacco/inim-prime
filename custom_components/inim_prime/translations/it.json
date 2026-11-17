@@ -401,7 +401,7 @@
   "services": {
     "connection_drops": {
       "name": "Cadute di connessione",
-      "description": "Elenca le cadute di connessione con la centrale registrate nello storico: connessione (Native o PrimeLAN), ora di inizio, durata e se coincidono con il riavvio periodico della rete della centrale.",
+      "description": "Elenca le cadute di connessione con la centrale registrate nello storico: ora di inizio, durata di ogni connessione caduta (Native, PrimeLAN) e se coincidono con il riavvio periodico della rete della centrale. Le due connessioni cadute insieme contano come una sola caduta.",
       "fields": {
         "days": {
           "name": "Giorni",
