@@ -164,11 +164,11 @@ def _scenario_to_unified(scenario: PrimelanScenarioStatus) -> UnifiedScenario:
 from ..const import (
     NATIVE_CYCLE_PAUSE_LEAD_FACTOR,
     NATIVE_CYCLE_PAUSE_LEAD_MARGIN,
-    NATIVE_CYCLE_PAUSE_LEAD_MAX,
     NATIVE_CYCLE_PAUSE_LEAD_MIN,
     NATIVE_CYCLE_PAUSE_LEAD_PERCENTILE,
     PRIMELAN_COMMAND_RETRY_INTERVAL,
     PRIMELAN_COMMAND_RETRY_WINDOW,
+    PRIMELAN_EXPECTED_MAX,
     PRIMELAN_REQUEST_DURATIONS_KEPT,
 )
 
@@ -200,6 +200,11 @@ class PrimelanAdapter:
         "_idle",
         "_paused",
         "_request_durations",
+        "_close_at",
+        "_reopened",
+        "_serial",
+        "_postponed",
+        "_last_end",
     )
 
     def __init__(self, client: InimPrimeClient) -> None:
@@ -225,13 +230,20 @@ class PrimelanAdapter:
         self._idle = asyncio.Event()
         self._idle.set()
         self._paused = False
-        # (command, seconds) of the last requests, for the pause's lead
+        # (command, seconds) of the last requests: how long each command takes
         self._request_durations: deque[tuple[str, float]] = deque(maxlen = PRIMELAN_REQUEST_DURATIONS_KEPT)
+        # Before a pause's close: the close time; a request starts only if its
+        # command is expected to end by then, one at a time, else it waits
+        # for the reopening.
+        self._close_at: float | None = None
+        self._reopened = asyncio.Event()
+        self._reopened.set()
+        self._serial = asyncio.Lock()
+        self._postponed: list[str] = []
+        self._last_end: float | None = None
         request = getattr(client, "_request", None)
 
-        async def _request(*args, **kwargs):
-            if not _REOPENING.get():
-                await self._open.wait()
+        async def _run(kind, args, kwargs):
             self._in_flight += 1
             self._idle.clear()
             started = time.monotonic()
@@ -243,11 +255,29 @@ class PrimelanAdapter:
                     return await original(client, *args, **kwargs)
                 return await original(*args, **kwargs)
             finally:
-                kind = str(kwargs.get("cmd", args[0] if args else "other"))
                 self._request_durations.append((kind, time.monotonic() - started))
+                self._last_end = time.time()
                 self._in_flight -= 1
                 if self._in_flight == 0:
                     self._idle.set()
+
+        async def _request(*args, **kwargs):
+            kind = str(kwargs.get("cmd", args[0] if args else "other"))
+            if _REOPENING.get():
+                return await _run(kind, args, kwargs)
+            while True:
+                await self._open.wait()
+                if self._close_at is None:
+                    return await _run(kind, args, kwargs)
+                # before the close: one at a time, and only if it fits
+                async with self._serial:
+                    close_at = self._close_at
+                    if close_at is None:
+                        return await _run(kind, args, kwargs)
+                    if self._open.is_set() and time.time() + self.expected_duration(kind) <= close_at:
+                        return await _run(kind, args, kwargs)
+                    self._postponed.append(kind)
+                await self._reopened.wait()
 
         # every PrimeLAN request goes through the client's _request
         if inspect.iscoroutinefunction(request):
@@ -321,26 +351,62 @@ class PrimelanAdapter:
                 longest[kind] = duration
         return dict(sorted(longest.items(), key = lambda item: -item[1]))
 
-    @property
-    def typical_longest_request(self) -> float | None:
-        """Duration that NATIVE_CYCLE_PAUSE_LEAD_PERCENTILE of the recently
-        measured requests do not exceed (seconds), if any."""
-        if not self._request_durations:
-            return None
-        durations = sorted(duration for _, duration in self._request_durations)
+    @staticmethod
+    def _typical(durations: list[float]) -> float:
+        """Duration that NATIVE_CYCLE_PAUSE_LEAD_PERCENTILE of them do not exceed."""
+        durations = sorted(durations)
         index = max(math.ceil(len(durations) * NATIVE_CYCLE_PAUSE_LEAD_PERCENTILE) - 1, 0)
         return durations[index]
 
     @property
+    def typical_longest_request(self) -> float | None:
+        """Typical duration of all the recently measured requests, if any."""
+        if not self._request_durations:
+            return None
+        return self._typical([duration for _, duration in self._request_durations])
+
+    def expected_duration(self, kind: str) -> float:
+        """How long a request of this command is expected to take, measured on
+        this panel like Native's lead (a rare slow one left out). A command
+        never measured: all the requests together; nothing measured yet:
+        PRIMELAN_EXPECTED_MAX."""
+        durations = [duration for k, duration in self._request_durations if k == kind]
+        if durations:
+            typical = self._typical(durations)
+        elif self._request_durations:
+            typical = self.typical_longest_request
+        else:
+            return PRIMELAN_EXPECTED_MAX
+        expected = typical * NATIVE_CYCLE_PAUSE_LEAD_FACTOR + NATIVE_CYCLE_PAUSE_LEAD_MARGIN
+        return min(max(expected, NATIVE_CYCLE_PAUSE_LEAD_MIN), PRIMELAN_EXPECTED_MAX)
+
+    @property
     def request_lead(self) -> float:
-        """How long before the planned close no new request should be sent:
-        measured on this panel like Native's. Until a request has been
-        measured, the longest lead allowed."""
-        typical = self.typical_longest_request
-        if typical is None:
-            return NATIVE_CYCLE_PAUSE_LEAD_MAX
-        lead = typical * NATIVE_CYCLE_PAUSE_LEAD_FACTOR + NATIVE_CYCLE_PAUSE_LEAD_MARGIN
-        return min(max(lead, NATIVE_CYCLE_PAUSE_LEAD_MIN), NATIVE_CYCLE_PAUSE_LEAD_MAX)
+        """How long before the close the check of each request starts: the
+        longest expected duration of the commands seen."""
+        kinds = {kind for kind, _ in self._request_durations}
+        if not kinds:
+            return PRIMELAN_EXPECTED_MAX
+        return max(self.expected_duration(kind) for kind in kinds)
+
+    def prepare(self, close_at: float) -> None:
+        """From now until the close, a request starts only if it is expected
+        to end by close_at, one at a time; the others wait for resume()."""
+        self._paused = True
+        self._postponed = []
+        self._last_end = None
+        self._reopened.clear()
+        self._close_at = close_at
+
+    @property
+    def postponed(self) -> list[str]:
+        """Commands held for the reopening at the last pause."""
+        return list(self._postponed)
+
+    @property
+    def last_end(self) -> float | None:
+        """Wall-clock time the last request before the close ended, if any."""
+        return self._last_end
 
     async def pause(self, close_at: float, latest: float) -> tuple[float, int]:
         """Stop sending requests now and close the client's connections at
@@ -350,10 +416,11 @@ class PrimelanAdapter:
 
         Returns the wall-clock time the connections were closed at and how
         many requests were still in flight at close_at."""
-        self._paused = True
-        self._open.clear()
+        if self._close_at is None:
+            self.prepare(close_at)
         while (remaining := close_at - time.time()) > 0:
             await asyncio.sleep(min(remaining, 0.5))
+        self._open.clear()
         in_flight = self._in_flight
         try:
             await asyncio.wait_for(self._idle.wait(), max(latest - time.time(), 0.0))
@@ -363,10 +430,15 @@ class PrimelanAdapter:
         await self._client.close()
         return time.time(), in_flight
 
+    def _end_pause(self) -> None:
+        self._paused = False
+        self._close_at = None
+        self._open.set()
+        self._reopened.set()
+
     def release(self) -> None:
         """End the pause without reopening (the integration is unloading)."""
-        self._paused = False
-        self._open.set()
+        self._end_pause()
 
     async def resume(self) -> bool:
         """Reopen the client and let the requests go on. False when the panel
@@ -382,8 +454,7 @@ class PrimelanAdapter:
             return False
         finally:
             _REOPENING.reset(token)
-            self._paused = False
-            self._open.set()
+            self._end_pause()
 
     # ------------------------------------------------------------------
     #   Properties

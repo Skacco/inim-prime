@@ -516,14 +516,39 @@ async def test_cycle_task_pauses_primelan_with_native(monkeypatch):
     assert events == [("primelan closed", -0.7), ("primelan opened", 0.5)]
 
 
-async def test_primelan_lead_is_measured_on_its_requests():
+async def test_primelan_expected_duration_is_measured_per_command():
     from custom_components.inim_prime.adapters import primelan_adapter as pa
-    from custom_components.inim_prime.const import NATIVE_CYCLE_PAUSE_LEAD_MAX
+    from custom_components.inim_prime.const import PRIMELAN_EXPECTED_MAX
 
     adapter = pa.PrimelanAdapter(_PrimelanClient())
-    # nothing measured yet: the longest lead allowed
-    assert adapter.request_lead == NATIVE_CYCLE_PAUSE_LEAD_MAX
-    adapter._request_durations.extend([("get_scenarios_status", 0.5)] * 99 + [("get_gsm_status", 2.0)])
-    # 98% within 0.5 s: 0.5 * 1.2 + 0.1, the rare slow one left out
-    assert adapter.request_lead == pytest.approx(0.7)
-    assert list(adapter.longest_request_by_kind) == ["get_gsm_status", "get_scenarios_status"]
+    # nothing measured yet: the upper bound
+    assert adapter.expected_duration("get_gsm_status") == PRIMELAN_EXPECTED_MAX
+    adapter._request_durations.extend(
+        [("get_scenarios_status", 2.0)] * 50 + [("get_gsm_status", 5.0)] * 10
+    )
+    assert adapter.expected_duration("get_scenarios_status") == pytest.approx(2.5)
+    assert adapter.expected_duration("get_gsm_status") == pytest.approx(6.1)
+    # the checks start by the slowest command
+    assert adapter.request_lead == pytest.approx(6.1)
+
+
+async def test_before_the_close_only_requests_that_fit_start_the_others_wait():
+    from custom_components.inim_prime.adapters import primelan_adapter as pa
+    import time
+
+    client = _PrimelanClient()
+    adapter = pa.PrimelanAdapter(client)
+    adapter._request_durations.extend(
+        [("get_scenarios_status", 0.01)] * 20 + [("get_gsm_status", 5.0)] * 20
+    )
+    adapter.prepare(close_at = time.time() + 1.0)
+
+    short = await client._request("get_scenarios_status")      # fits: runs
+    assert short == {} and client.requests == ["get_scenarios_status"]
+    long = asyncio.create_task(client._request("get_gsm_status"))  # does not fit
+    await asyncio.sleep(0.05)
+    assert not long.done() and adapter.postponed == ["get_gsm_status"]
+
+    assert await adapter.resume()
+    await long
+    assert client.requests == ["get_scenarios_status", "ping", "get_gsm_status"]

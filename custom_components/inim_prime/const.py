@@ -74,6 +74,9 @@ NATIVE_REQUEST_DURATIONS_KEPT = 2000
 # PrimeLAN requests whose duration is remembered for its pause's lead
 # (they are fewer than Native's: a few every ten seconds).
 PRIMELAN_REQUEST_DURATIONS_KEPT = 500
+# Upper bound to a PrimeLAN command's expected duration (seconds): the
+# client's own timeout is longer; before anything is measured, this.
+PRIMELAN_EXPECTED_MAX = 10.0
 
 # Native defaults
 NATIVE_PORT_DEFAULT: Final[int] = inim.prime.native.const.Panel.DEFAULT_PORT

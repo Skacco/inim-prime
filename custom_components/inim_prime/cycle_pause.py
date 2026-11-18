@@ -71,17 +71,19 @@ async def run_cycle_pause(
     The Native connection is closed exactly `before` seconds ahead of the
     instant and reopened exactly `after` seconds past it, on any
     installation: how early the requests have to stop for that is measured
-    on the panel. With PrimeLAN too, its requests are stopped early enough,
-    measured the same way on its own requests, and its connections are
-    closed at the same time as the Native one: a PrimeLAN request open at
-    the instant was seen restarting the panel's network as well."""
+    on the panel. With PrimeLAN too, before the close each PrimeLAN request
+    starts only if its command, by its own measured duration, ends by the
+    close (one at a time, the others wait for the reopening), and its
+    connections are closed at the same time as the Native one: a PrimeLAN
+    request open at the instant was seen restarting the panel's network as
+    well."""
     while True:
         instant = next_cycle_instant(time.time() + before + NATIVE_CYCLE_PAUSE_LEAD_MAX + 1.0)
         primelan_task = None
         primelan_lead = 0.0
         if primelan is not None:
-            # PrimeLAN stops by its own lead, or Native's if that is longer:
-            # Native's wait below starts only after this one
+            # PrimeLAN's checks start by its slowest command, or by Native's
+            # lead if that is longer: Native's wait below starts after this one
             primelan_lead = await _sleep_until_requests_stop(
                 _Earliest(adapter, primelan), instant - before,
             )
@@ -179,13 +181,17 @@ async def _end_primelan_pause(
     except Exception as err:  # noqa: BLE001 - closing the client failed
         _LOGGER.debug("Cycle pause: closing the PrimeLAN connections failed (%s)", err)
         closed_at, in_flight = None, 0
+    postponed = primelan.postponed
+    last_end = primelan.last_end
     reopened = await primelan.resume()
     if closed_at is not None:
         _LOGGER.debug(
             "Cycle pause: PrimeLAN connections closed %.2fs before the panel's "
-            "cycle (planned %.1fs), no new request from %.2fs earlier (longest "
-            "measured: %s), %s",
-            instant - closed_at, before, lead, _longest(primelan),
+            "cycle (planned %.1fs); checks from %.2fs earlier, last request "
+            "ended %s, held for the reopening: %s (longest measured: %s), %s",
+            instant - closed_at, before, lead,
+            f"{closed_at - last_end:.2f}s before the close" if last_end is not None else "before the checks",
+            ", ".join(postponed) or "none", _longest(primelan),
             "reopened" if reopened else "not reopened at once",
         )
         if closed_at > instant:
