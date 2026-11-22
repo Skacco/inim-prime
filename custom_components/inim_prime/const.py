@@ -49,7 +49,9 @@ PERIODIC_DROP_TOLERANCE = 5.0
 # Closed exactly this long before the instant, on any panel (clean cycles
 # were seen closing 0.6-1.2s ahead).
 NATIVE_CYCLE_PAUSE_BEFORE = 0.7
-NATIVE_CYCLE_PAUSE_AFTER = 0.5
+# Reopened this long after: at 0.5s the panel now and then restarted its
+# network just after the reopening (drops seen starting 0.54s past the instant).
+NATIVE_CYCLE_PAUSE_AFTER = 0.8
 # The connection is closed exactly the configured time before the instant,
 # whatever the size of the installation. For that no new request is sent
 # from a little earlier: the longest request measured on this panel, times

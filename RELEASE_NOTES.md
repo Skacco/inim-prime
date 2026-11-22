@@ -1,6 +1,6 @@
 ## Novità 1.2.0
 
-- **Riavvio periodico della centrale**: con la connessione Native, l'integrazione chiude le sue connessioni (anche PrimeLAN, se configurata) per circa un secondo attorno al riavvio periodico della rete della centrale (ogni ~71,6 minuti), che così non fa più cadere le connessioni.
+- **Riavvio periodico della centrale**: con la connessione Native, l'integrazione chiude le sue connessioni (anche PrimeLAN, se configurata) per circa un secondo e mezzo attorno al riavvio periodico della rete della centrale (ogni ~71,6 minuti), che così non fa più cadere le connessioni.
 - **Manutenzione interna**: adeguamenti ai controlli di validazione di Home Assistant e HACS.
 - **Pacchetto di installazione**: l'integrazione viene ora distribuita da HACS come pacchetto unico allegato alla release.
 - **Zone doppie con firmware 4**: l'esclusione della seconda zona ora funziona anche con firmware 4.
