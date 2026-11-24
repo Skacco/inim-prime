@@ -1,3 +1,7 @@
+## Novità 1.2.1
+
+- La configurazione Native non si blocca più sulle centrali con nomi mai programmati.
+
 ## Novità 1.2.0
 
 - **Riavvio periodico della centrale**: con la connessione Native, l'integrazione chiude le sue connessioni (anche PrimeLAN, se configurata) per circa un secondo attorno al riavvio periodico della rete della centrale (ogni ~71,6 minuti), che così non fa più cadere le connessioni.
