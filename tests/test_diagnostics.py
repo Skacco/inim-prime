@@ -21,6 +21,7 @@ async def test_entry_diagnostics_lists_zones_and_partitions(monkeypatch):
         backends_active = ["native"], zones = {3: zone}, partitions = {1: partition},
         system_faults = None, gsm = None,
         scenarios = {2: SimpleNamespace(label = "Totale", active = True)},
+        native_adapter = SimpleNamespace(panel_firmware_and_model = ("2.01", "PRIME060")),
     )
     entry = SimpleNamespace(
         runtime_data = SimpleNamespace(gateway = gateway),
@@ -30,6 +31,8 @@ async def test_entry_diagnostics_lists_zones_and_partitions(monkeypatch):
 
     result = await diagnostics.async_get_config_entry_diagnostics(None, entry)
 
+    assert result["panel"]["firmware"] == "2.01"
+    assert result["panel"]["model"] == "PRIME060"
     assert result["zones"][3]["native_status_bytes"] == "01 02"
     assert result["partitions"][1]["label"] == "Casa"
     assert result["options"]["alarm_pin"] == "**REDACTED**"

@@ -320,6 +320,15 @@ class NativeAdapter:
     def password_rejected(self) -> bool:
         return self._password_rejected
 
+    @property
+    def panel_firmware_and_model(self) -> tuple[str | None, str | None]:
+        """Firmware version and model the panel reported at connection."""
+        info = self._client.panel_info
+        if info is None:
+            return None, None
+        _, firmware, model = info
+        return firmware, model
+
     def _raise_if_password_rejected(self, err: BaseException | None = None) -> None:
         """Stop for good when the panel refuses the password.
 

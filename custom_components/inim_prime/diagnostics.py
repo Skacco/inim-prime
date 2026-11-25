@@ -24,8 +24,12 @@ async def async_get_config_entry_diagnostics(
 
     gateway = entry.runtime_data.gateway
     data = get_entry_data(entry)
+    native = getattr(gateway, "native_adapter", None)
+    firmware, model = native.panel_firmware_and_model if native is not None else (None, None)
     diagnostics: dict[str, Any] = {"panel": {
         "serial_number": data["serial_number"],
+        "model": model,
+        "firmware": firmware,
         "backends_active": gateway.backends_active,
     }, "zones": {
         zone_id: {
