@@ -1,6 +1,7 @@
 ## Novità 1.2.1
 
-- La configurazione Native non si blocca più sulle centrali con nomi mai programmati.
+- Corretta la configurazione Native sulle centrali con nomi mai programmati.
+- Centrali con firmware 2.x: non vengono più lette zone inesistenti.
 
 ## Novità 1.2.0
 
