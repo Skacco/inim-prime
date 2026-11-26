@@ -976,8 +976,8 @@ async def async_migrate_entry(hass: HomeAssistant, entry: InimPrimeConfigEntry) 
             minor_version = 0,
         )
 
-    if entry.version == 2 and entry.minor_version < 1:
-        # 2.1: with Native, scenarios, faults and the event log come from it.
+    if entry.version == 2 and entry.minor_version < 2:
+        # 2.1/2.2: with Native, scenarios, faults and the event log come from it.
         # Intervals still at the old PrimeLAN defaults take the Native ones;
         # values the user chose stay as they are.
         options = dict(entry.options)
@@ -991,6 +991,6 @@ async def async_migrate_entry(hass: HomeAssistant, entry: InimPrimeConfigEntry) 
                 if intervals.get(key) == old:
                     intervals[key] = new
             options["scan_intervals"] = intervals
-        hass.config_entries.async_update_entry(entry, options = options, minor_version = 1)
+        hass.config_entries.async_update_entry(entry, options = options, minor_version = 2)
 
     return True

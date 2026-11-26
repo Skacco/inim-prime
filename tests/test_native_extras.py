@@ -151,7 +151,7 @@ async def test_old_primelan_defaults_move_to_the_native_ones(hass):
 
     assert await async_migrate_entry(hass, entry)
 
-    assert entry.minor_version == 1
+    assert entry.minor_version == 2
     assert entry.options["scan_intervals"] == {
         "gsm": 60000.0,                 # still PrimeLAN
         "system_faults": 10000,         # old default -> Native default
