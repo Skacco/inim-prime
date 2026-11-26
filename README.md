@@ -64,17 +64,9 @@ Verifica sempre le operazioni critiche direttamente sulla centrale Inim Prime o 
 > **Prima di installare**, se non l'hai già fatto, prepara la centrale con Prime/STUDIO: vedi **[Configurazione della centrale Inim Prime](#configurazione-della-centrale-inim-prime)** in fondo a questa pagina.
 
 # Installazione in Home Assistant
-> **Hai già l'integrazione originale di Pitscheider?** Le due non possono stare installate insieme: usano lo stesso dominio (`inim_prime`) e la stessa cartella, quindi questa **la sostituisce**. Rimuovi dal Marketplace il repository originale, aggiungi questo, scarica e riavvia. La configurazione esistente (connessione e intervalli) viene ripresa; le zone e le aree vengono raggruppate in un unico dispositivo ciascuna e i sensori «Stato» e gli interruttori «Esclusione» delle zone vengono ricreati. Le entità già esistenti conservano i vecchi ID: per averli aggiornati usa **Ricrea ID entità** nel menù di ogni dispositivo, oppure rimuovi l'integrazione e aggiungila di nuovo.
-
-## Dal Marketplace (consigliato)
 È il modo consigliato perché gestisce gli aggiornamenti. Il negozio delle integrazioni è ormai integrato in Home Assistant (Marketplace), quindi non serve installare altro.
-### Aggiungi il repository personalizzato
-Apri il **Marketplace** → menu in alto a destra (tre puntini) → `Repository personalizzati`.
-Nel campo `Repository` incolla `https://github.com/Skacco/inim-prime`, come categoria scegli `Integration`, premi `ADD`.
-### Installa l'integrazione
-Cerca `Inim Prime`, aprila e premi `DOWNLOAD`. Alla **prima installazione non serve riavviare**: puoi aggiungere subito l'integrazione (vedi sotto). Il riavvio viene richiesto solo per gli **aggiornamenti** successivi.
-## Installazione manuale (sconsigliata)
-Scarica il codice sorgente dell'ultima release da [https://github.com/Skacco/inim-prime](https://github.com/Skacco/inim-prime), copia la cartella `inim_prime` dentro `custom_components` della tua configurazione Home Assistant e riavvia.
+
+Apri il **Marketplace**, cerca `Inim` (trovi **Inim Prime & SmartLiving**), aprila e premi `DOWNLOAD`. Alla **prima installazione non serve riavviare**: puoi aggiungere subito l'integrazione (vedi sotto). Il riavvio viene richiesto solo per gli **aggiornamenti** successivi.
 
 # Configurazione dell'integrazione in Home Assistant
 Vai in `Impostazioni` → `Dispositivi e servizi` → `Aggiungi integrazione`, cerca `Inim Prime`.

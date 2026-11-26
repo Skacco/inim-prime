@@ -64,17 +64,9 @@ Always verify critical operations directly on the Inim Prime panel or through th
 > **Before installing**, if you haven't already, set up the panel with Prime/STUDIO: see **[Inim Prime panel setup](#inim-prime-panel-setup)** at the bottom of this page.
 
 # Installation in Home Assistant
-> **Already using Pitscheider's original integration?** The two cannot be installed side by side: they share the same domain (`inim_prime`) and folder, so this one **replaces it**. Remove the original repository from the Marketplace, add this one, download and restart. The existing configuration (connection and scan intervals) is kept; zones and partitions are grouped into one device each, and the zone "State" sensors and "Bypass" switches are recreated. Existing entities keep their old IDs: to refresh them use **Recreate entity IDs** in each device's menu, or remove the integration and add it again.
-
-## From the Marketplace (recommended)
 This is the recommended way because it handles updates. The integrations store is now built into Home Assistant (Marketplace), so there is nothing else to install.
-### Add the custom repository
-Open the **Marketplace** → top-right menu (three dots) → `Custom repositories`.
-In the `Repository` field paste `https://github.com/Skacco/inim-prime`, choose `Integration` as the category, press `ADD`.
-### Install the integration
-Search for `Inim Prime`, open it and press `DOWNLOAD`. On the **first install no restart is needed**: you can add the integration right away (see below). A restart is only required for later **updates**.
-## Manual installation (not recommended)
-Download the source code of the latest release from [https://github.com/Skacco/inim-prime](https://github.com/Skacco/inim-prime), copy the `inim_prime` folder into `custom_components` of your Home Assistant configuration and restart.
+
+Open the **Marketplace**, search for `Inim` (you'll find **Inim Prime & SmartLiving**), open it and press `DOWNLOAD`. On the **first install no restart is needed**: you can add the integration right away (see below). A restart is only required for later **updates**.
 
 # Integration setup in Home Assistant
 Go to `Settings` → `Devices & services` → `Add integration`, search for `Inim Prime`.
