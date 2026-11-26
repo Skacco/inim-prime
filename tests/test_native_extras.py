@@ -1,0 +1,114 @@
+"""Native scenarios, system faults and event log, on answers of a real Prime."""
+import asyncio
+from types import SimpleNamespace
+
+from custom_components.inim_prime.adapters import native_adapter as na
+from custom_components.inim_prime.adapters import native_extras as extras
+from custom_components.inim_prime.gateway import InimPrimeGateway
+from custom_components.inim_prime.models.system_faults import UnifiedSystemFault
+
+from . import native_prime_data as d
+
+LOG_ADDRESS = 0xA1D0
+NEXT_INDEX = 0x0A2F
+
+
+def _fake_client(active=d.SCENARIOS_ACTIVE_SPENTO, status=d.SYSTEM_STATUS_OK):
+    records_start = LOG_ADDRESS + (NEXT_INDEX - len(d.RECORDS) // 14) * 14
+    memory = {
+        0x1A002400: d.LABEL_POINTERS,
+        0x14030D20: d.AREA_LABELS,
+        0x1403AFA0: d.KEYPAD_LABELS,
+        0x1403D8E0: d.SCENARIO_LABELS,
+        0x14038CA0: d.USER_LABELS,
+        0x1A03786C: d.EVENT_TYPES,
+        0x14595644: d.EVENT_TEXTS,
+        records_start: d.RECORDS,
+    }
+    commands = []
+
+    async def read_memory(address, length):
+        for start, data in memory.items():
+            if start <= address < start + len(data):
+                chunk = data[address - start:address - start + length]
+                return chunk + bytes(length - len(chunk))
+        return bytes(length)
+
+    async def exchange_payload(payload, operation, response_payload_length):
+        op = int.from_bytes(payload[:4], "little")
+        commands.append(payload)
+        if op == 5:
+            return d.SCENARIOS_PROGRAMMED if payload[-1] == 1 else active
+        return {13: status, 18: d.LOG_INFO, 31: d.LOG_TABLES}.get(op, bytes(response_payload_length))
+
+    client = SimpleNamespace(
+        _lock = asyncio.Lock(),
+        _protocol = SimpleNamespace(read_memory = read_memory, exchange_payload = exchange_payload),
+        is_connected = True,
+    )
+    return client, commands
+
+
+def test_scenario_masks():
+    assert extras.parse_scenario_mask(d.SCENARIOS_PROGRAMMED) == frozenset(range(12))
+    assert extras.parse_scenario_mask(d.SCENARIOS_ACTIVE_SPENTO) == {0}
+    assert extras.parse_scenario_mask(d.SCENARIOS_ACTIVE_ACCESO_GIORNO) == {2}
+
+
+def test_system_status():
+    assert extras.parse_system_status(d.SYSTEM_STATUS_OK) == (0, 13.6)
+    assert extras.parse_system_status(d.SYSTEM_STATUS_NO_PHONE_LINE)[0] == 0x10
+
+
+def test_activation_payloads_match_the_app():
+    # as captured, with the master PIN in place of the user code
+    assert extras.scenario_prepare_payload(2) == bytes.fromhex("3c000000") + bytes(16) + b"\x02\x01" + b"\x74" + bytes(5)
+    assert extras.scenario_activate_payload(2) == bytes.fromhex("3b0000000200") + b"\x74" + bytes(5)
+
+
+async def test_scenarios_names_and_active():
+    client, _ = _fake_client(active = d.SCENARIOS_ACTIVE_ACCESO_GIORNO)
+    gateway = InimPrimeGateway(native = na.NativeAdapter(client))
+
+    scenarios = await gateway.update_scenarios()
+
+    assert len(scenarios) == 12
+    assert scenarios[0].label == "Spento" and scenarios[2].label == "Acceso giorno"
+    assert [s.scenario_id for s in scenarios.values() if s.active] == [2]
+
+
+async def test_activate_scenario_sends_both_commands():
+    client, commands = _fake_client()
+    gateway = InimPrimeGateway(native = na.NativeAdapter(client))
+
+    await gateway.activate_scenario(2)
+
+    assert [int.from_bytes(c[:4], "little") for c in commands] == [60, 59]
+
+
+async def test_system_faults():
+    client, _ = _fake_client(status = d.SYSTEM_STATUS_NO_PHONE_LINE)
+    gateway = InimPrimeGateway(native = na.NativeAdapter(client))
+
+    faults = await gateway.update_system_faults()
+
+    assert faults.faults == {UnifiedSystemFault.NO_TELEPHONE_LINE}
+    assert faults.supply_voltage == 13.6
+
+
+async def test_log_events_read_like_primelan():
+    client, _ = _fake_client()
+    gateway = InimPrimeGateway(native = na.NativeAdapter(client))
+
+    events = await gateway.get_log_events(6)
+
+    assert [(e.type, e.agent, e.location) for e in events] == [
+        ("Disins. area     - Vol. Interrato", "Da remoto", "Home Assistant"),
+        ("ScenarioAttivato", None, "Spento"),
+        ("Fine Disins. area     - Vol. Interrato", "Da remoto", "Mario"),
+        ("MancanzaLineaTel", None, None),
+        ("Fine MancanzaLineaTel", None, None),
+        ("Codice valido", "TAST. GARAGE", "Mario"),
+    ]
+    assert events[0].timestamp.strftime("%Y-%m-%d %H:%M:%S") == "2026-11-26 13:07:23"
+    assert events[-1].id == NEXT_INDEX - 1

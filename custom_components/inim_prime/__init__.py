@@ -37,6 +37,9 @@ from .const import (
     OUTPUTS_SCAN_INTERVAL_PRIMELAN_DEFAULT,
     OUTPUTS_SCAN_INTERVAL_NATIVE_DEFAULT,
     SCENARIOS_SCAN_INTERVAL_PRIMELAN_DEFAULT,
+    SCENARIOS_SCAN_INTERVAL_NATIVE_DEFAULT,
+    SYSTEM_FAULTS_SCAN_INTERVAL_NATIVE_DEFAULT,
+    PANEL_LOG_EVENTS_SCAN_INTERVAL_NATIVE_DEFAULT,
     TIMERS_SCAN_INTERVAL_DEFAULT,
     THERMOSTATS_SCAN_INTERVAL_DEFAULT,
     SHUTTER_FIELD_OPEN,
@@ -258,10 +261,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: InimPrimeConfigEntry) ->
             gateway = inim_gateway,
         )
 
+    # Native also reads scenarios, faults and the event log (faster defaults).
+    has_native = bool(data.get("native"))
+
     if inim_gateway.supports_system_faults:
         system_faults_coordinator = InimPrimeSystemFaultsUpdateCoordinator(
             hass = hass,
-            update_interval = timedelta(milliseconds = scan_intervals["system_faults"]),
+            update_interval = timedelta(milliseconds = scan_intervals.get(
+                "system_faults",
+                SYSTEM_FAULTS_SCAN_INTERVAL_NATIVE_DEFAULT if has_native else SYSTEM_FAULTS_SCAN_INTERVAL_PRIMELAN_DEFAULT,
+            )),
             entry = entry,
             gateway = inim_gateway,
         )
@@ -278,7 +287,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: InimPrimeConfigEntry) ->
         panel_log_events_coordinator = InimPrimePanelLogEventsCoordinator(
             hass = hass,
             update_interval = timedelta(milliseconds = scan_intervals.get(
-                "panel_log_events", PANEL_LOG_EVENTS_SCAN_INTERVAL_PRIMELAN_DEFAULT,
+                "panel_log_events",
+                PANEL_LOG_EVENTS_SCAN_INTERVAL_NATIVE_DEFAULT if has_native else PANEL_LOG_EVENTS_SCAN_INTERVAL_PRIMELAN_DEFAULT,
             )),
             entry = entry,
             gateway = inim_gateway,
@@ -299,7 +309,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: InimPrimeConfigEntry) ->
     if inim_gateway.supports_scenarios:
         scenarios_coordinator = InimPrimeScenariosUpdateCoordinator(
             hass = hass,
-            update_interval = timedelta(milliseconds = scan_intervals.get("scenarios", SCENARIOS_SCAN_INTERVAL_PRIMELAN_DEFAULT)),
+            update_interval = timedelta(milliseconds = scan_intervals.get(
+                "scenarios",
+                SCENARIOS_SCAN_INTERVAL_NATIVE_DEFAULT if has_native else SCENARIOS_SCAN_INTERVAL_PRIMELAN_DEFAULT,
+            )),
             entry = entry,
             gateway = inim_gateway,
         )

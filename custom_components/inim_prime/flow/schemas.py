@@ -24,6 +24,9 @@ from ..const import (
     OUTPUTS_SCAN_INTERVAL_NATIVE_DEFAULT,
     OUTPUTS_SCAN_INTERVAL_PRIMELAN_DEFAULT,
     SCENARIOS_SCAN_INTERVAL_PRIMELAN_DEFAULT,
+    SCENARIOS_SCAN_INTERVAL_NATIVE_DEFAULT,
+    SYSTEM_FAULTS_SCAN_INTERVAL_NATIVE_DEFAULT,
+    PANEL_LOG_EVENTS_SCAN_INTERVAL_NATIVE_DEFAULT,
     PRIMELAN_SCAN_INTERVAL_BOTH_DEFAULT,
     NATIVE_PASSWORD_DEFAULT,
     NATIVE_CHECK_PORT_EXPOSED_DEFAULT,
@@ -246,9 +249,11 @@ def build_scan_intervals_schema(
     shows them on a page of their own, so the accordion would just be noise.
     """
     both_backends = has_native and has_primelan
+    # with Native, scenarios, faults and the event log come from it; only GSM
+    # stays on PrimeLAN (slower when both are configured)
     gsm_default = PRIMELAN_SCAN_INTERVAL_BOTH_DEFAULT if both_backends else GSM_SCAN_INTERVAL_PRIMELAN_DEFAULT
-    faults_default = PRIMELAN_SCAN_INTERVAL_BOTH_DEFAULT if both_backends else SYSTEM_FAULTS_SCAN_INTERVAL_PRIMELAN_DEFAULT
-    log_default = PRIMELAN_SCAN_INTERVAL_BOTH_DEFAULT if both_backends else PANEL_LOG_EVENTS_SCAN_INTERVAL_PRIMELAN_DEFAULT
+    faults_default = SYSTEM_FAULTS_SCAN_INTERVAL_NATIVE_DEFAULT if has_native else SYSTEM_FAULTS_SCAN_INTERVAL_PRIMELAN_DEFAULT
+    log_default = PANEL_LOG_EVENTS_SCAN_INTERVAL_NATIVE_DEFAULT if has_native else PANEL_LOG_EVENTS_SCAN_INTERVAL_PRIMELAN_DEFAULT
     scan_intervals_defaults = ScanIntervalsDefault(
         zones = ZONES_SCAN_INTERVAL_NATIVE_DEFAULT if has_native else ZONES_SCAN_INTERVAL_PRIMELAN_DEFAULT,
         partitions = PARTITIONS_SCAN_INTERVAL_NATIVE_DEFAULT if has_native else PARTITIONS_SCAN_INTERVAL_PRIMELAN_DEFAULT,
@@ -256,7 +261,7 @@ def build_scan_intervals_schema(
         system_faults = faults_default,
         panel_log_events = log_default,
         outputs = OUTPUTS_SCAN_INTERVAL_NATIVE_DEFAULT if has_native else OUTPUTS_SCAN_INTERVAL_PRIMELAN_DEFAULT,
-        scenarios = SCENARIOS_SCAN_INTERVAL_PRIMELAN_DEFAULT,
+        scenarios = SCENARIOS_SCAN_INTERVAL_NATIVE_DEFAULT if has_native else SCENARIOS_SCAN_INTERVAL_PRIMELAN_DEFAULT,
     )
 
     if current_options is not None:
@@ -304,20 +309,11 @@ def build_scan_intervals_schema(
         )),
     }
 
-    if has_primelan:
+    # scenarios, faults and event log: from Native or PrimeLAN
+    if has_native or has_primelan:
         scan_interval_fields[vol.Required(
             OptionsKey.ScanIntervals.SCENARIOS,
             default = scan_intervals_defaults["scenarios"],
-        )] = NumberSelector(NumberSelectorConfig(
-            min = SCAN_INTERVAL_MIN,
-            max = SCAN_INTERVAL_MAX,
-            mode = NumberSelectorMode.BOX,
-            unit_of_measurement = "ms",
-        ))
-
-        scan_interval_fields[vol.Required(
-            OptionsKey.ScanIntervals.GSM,
-            default = scan_intervals_defaults["gsm"],
         )] = NumberSelector(NumberSelectorConfig(
             min = SCAN_INTERVAL_MIN,
             max = SCAN_INTERVAL_MAX,
@@ -338,6 +334,17 @@ def build_scan_intervals_schema(
         scan_interval_fields[vol.Required(
             OptionsKey.ScanIntervals.PANEL_LOG_EVENTS,
             default = scan_intervals_defaults["panel_log_events"],
+        )] = NumberSelector(NumberSelectorConfig(
+            min = SCAN_INTERVAL_MIN,
+            max = SCAN_INTERVAL_MAX,
+            mode = NumberSelectorMode.BOX,
+            unit_of_measurement = "ms",
+        ))
+
+    if has_primelan:
+        scan_interval_fields[vol.Required(
+            OptionsKey.ScanIntervals.GSM,
+            default = scan_intervals_defaults["gsm"],
         )] = NumberSelector(NumberSelectorConfig(
             min = SCAN_INTERVAL_MIN,
             max = SCAN_INTERVAL_MAX,
@@ -397,7 +404,7 @@ def build_general_params_schema(
             OptionsKey.WEBHOOK_ALLOW_REMOTE,
             default = bool(current_options.webhook_allow_remote) if current_options else False,
         )] = bool
-    if has_primelan:
+    if has_native or has_primelan:
         fetch = (
             current_options.panel_log_events_fetch_limit
             if current_options and current_options.panel_log_events_fetch_limit is not None

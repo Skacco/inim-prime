@@ -156,6 +156,57 @@ SENSOR_LABELS_ADDRESS: Final[int] = 335802368
 SENSOR_LABELS_COUNT: Final[int] = 15
 THERMOSTATS_SCAN_INTERVAL_DEFAULT: Final[int] = 30000
 
+# Native scenarios, system status and event log: the commands the Inim app
+# sends in local (P2P) mode, read from a decrypted capture. Like the
+# thermostat status, they carry the master PIN (74 00 00 00 00 00) instead of
+# a user code. Each payload starts with the operation (4 bytes LE).
+NATIVE_MASTER_PIN: Final[bytes] = b"\x74\x00\x00\x00\x00\x00"
+# op 5: scenarios, + partition mask (4) + PIN + 0 = active / 1 = programmed;
+# the answer holds the scenario bitmask from byte 20 on.
+NATIVE_SCENARIOS_OPERATION: Final[int] = 5
+NATIVE_SCENARIOS_PARTITION_MASK: Final[bytes] = b"\xff\xff\x0f\x00"
+NATIVE_SCENARIOS_LENGTH: Final[int] = 27
+NATIVE_SCENARIOS_MASK_OFFSET: Final[int] = 20
+NATIVE_SCENARIOS_MASK_SIZE: Final[int] = 7
+# op 60 then op 59 activate a scenario (0-based), as the app does.
+NATIVE_SCENARIO_PREPARE_OPERATION: Final[int] = 60
+NATIVE_SCENARIO_PREPARE_LENGTH: Final[int] = 270
+NATIVE_SCENARIO_ACTIVATE_OPERATION: Final[int] = 59
+NATIVE_SCENARIO_ACTIVATE_LENGTH: Final[int] = 271
+# op 13: system status, fault bits (same bits as PrimeLAN) at byte 4 and the
+# supply voltage in tenths of a volt at byte 20.
+NATIVE_SYSTEM_STATUS_OPERATION: Final[int] = 13
+NATIVE_SYSTEM_STATUS_LENGTH: Final[int] = 58
+NATIVE_FAULTS_OFFSET: Final[int] = 4
+NATIVE_SUPPLY_VOLTAGE_OFFSET: Final[int] = 20
+# op 18: event log (next index, record size, address, capacity); op 31: the
+# address and size of the event type table (5 bytes per type).
+NATIVE_LOG_INFO_OPERATION: Final[int] = 18
+NATIVE_LOG_INFO_LENGTH: Final[int] = 18
+NATIVE_LOG_TABLES_OPERATION: Final[int] = 31
+NATIVE_LOG_TABLES_LENGTH: Final[int] = 28
+NATIVE_EVENT_TYPE_SIZE: Final[int] = 5
+# Label pointer table (one 4-byte LE address per table).
+NATIVE_LABEL_POINTERS_ADDRESS: Final[int] = 0x1A002400
+NATIVE_LABEL_POINTERS: Final[dict[str, int]] = {
+    "area": 20, "zone": 24, "user": 28, "reader": 32, "keypad": 36,
+    "expansion": 40, "key": 44, "phone": 48, "scenario": 52, "timer": 56,
+    "event_text": 64, "siren": 68,
+}
+# Object kind (4th byte of an event type) -> label table.
+NATIVE_EVENT_OBJECT_KINDS: Final[dict[int, str]] = {
+    0x01: "zone", 0x0C: "zone", 0x02: "area", 0x03: "user", 0x04: "key",
+    0x05: "phone", 0x06: "timer", 0x08: "expansion", 0x09: "keypad",
+    0x0A: "reader", 0x0B: "siren", 0x0D: "scenario",
+}
+# Users not in the code table (e.g. 255) are commands without a user code:
+# Home Assistant itself.
+NATIVE_NO_USER_LABEL: Final[str] = "Home Assistant"
+NATIVE_REMOTE_LABEL: Final[str] = "Da remoto"
+SCENARIOS_SCAN_INTERVAL_NATIVE_DEFAULT: Final[int] = 2000
+SYSTEM_FAULTS_SCAN_INTERVAL_NATIVE_DEFAULT: Final[int] = 10000
+PANEL_LOG_EVENTS_SCAN_INTERVAL_NATIVE_DEFAULT: Final[int] = 10000
+
 # Per-shutter option field labels (shown as the field names in the options form,
 # and stored as the keys of the shutter command mapping).
 SHUTTER_FIELD_OPEN = "Aperto"

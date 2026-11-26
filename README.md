@@ -19,20 +19,21 @@ Espone:
 - **timer**
 - **termostati** (sensori di temperatura)
 - **tapparelle** (comandate tramite le uscite-comando della centrale)
+- **scenari** (un pulsante per scenario + sensore "Scenario attivo")
+- **guasti di sistema** e tensione di alimentazione
+- **registro eventi** della centrale (tipo, dove e chi, come in PrimeLAN; i comandi da Home Assistant compaiono come utente «Home Assistant»)
 
 Richiede solo la raggiungibilità della porta del protocollo locale e la relativa password. **Non** richiede la scheda PrimeLAN.
 
 ### PrimeLAN — Web API ufficiale Inim
-Usa la **Web API ufficiale Inim** esposta dalla scheda di rete **PrimeLAN**. Aggiunge le funzioni che il protocollo locale non espone:
-- **scenari** (un pulsante per scenario + sensore "Scenario attivo")
+Usa la **Web API ufficiale Inim** esposta dalla scheda di rete **PrimeLAN**. Da sola copre zone, aree, uscite, scenari, guasti e registro eventi; insieme al Native aggiunge ciò che il protocollo locale non espone:
 - **stato GSM** (operatore, potenza segnale, credito)
-- **guasti di sistema**
-- **registro eventi** della centrale
+- **push in tempo reale** (webhook, facoltativo)
 
 Richiede la **scheda di rete PrimeLAN** installata nella centrale.
 
 ### Entrambi (consigliato)
-Attivi le due modalità di integrazione insieme: **Native** fa il lavoro locale e veloce (zone, aree, uscite, tapparelle, termostati, timer), **PrimeLAN** aggiunge scenari, GSM, guasti e registro. Il **pannello di allarme** di Home Assistant unisce i due mondi: legge lo stato dalle aree e invia i comandi di inserimento/disinserimento tramite gli **scenari** PrimeLAN.
+Attivi le due modalità di integrazione insieme: **Native** fa tutto il lavoro locale e veloce (zone, aree, uscite, tapparelle, termostati, timer, scenari, guasti e registro), **PrimeLAN** aggiunge GSM e push in tempo reale. Il **pannello di allarme** di Home Assistant unisce scenari e aree: per ogni comando scegli uno scenario o un insieme di aree.
 
 ## Compatibilità firmware
 Testata sia con centrali a **firmware 4.x** sia a **firmware 5.x**.
@@ -113,16 +114,24 @@ Clicca l'icona dell'ingranaggio accanto alla centrale. Puoi configurare:
 Numero massimo di eventi scaricati quando vengono rilevati nuovi log. Consigliato il valore predefinito; l'integrazione ne scarica automaticamente di più se serve. Non è in tempo reale (il recupero è asincrono).
 
 ## Intervalli di scansione
-Ogni quanto Home Assistant interroga la centrale (valori più bassi = più traffico). Ogni campo indica la **modalità di integrazione** usata: **Zone / Aree / Uscite** sono lette dal **Native** se configurato (locale, veloce), altrimenti da **PrimeLAN**; **GSM / Guasti / Eventi registro / Scenari** sono **solo PrimeLAN**.
+Ogni quanto Home Assistant interroga la centrale (valori più bassi = più traffico). La schermata mostra solo i campi delle modalità configurate:
+
+| Campo | Solo Native | Solo PrimeLAN | Entrambe |
+|---|---|---|---|
+| Zone, aree, uscite | ✅ | ✅ | ✅ |
+| Scenari, guasti, eventi | ✅ | ✅ | ✅ |
+| GSM | — | ✅ | ✅ |
+
+Con il Native configurato, zone, aree, uscite, scenari, guasti ed eventi arrivano dal Native; il GSM arriva sempre dalla PrimeLAN.
 
 ⚠️ La modalità **Native** supporta intervalli molto più bassi di PrimeLAN per zone, aree e uscite (polling locale).
 
-ℹ️ Quando usi **entrambe** le modalità di integrazione, i dati "vivi" arrivano dal Native, quindi i poller **solo-PrimeLAN** partono con un **default più lento (60s per GSM, guasti ed eventi registro)** per ridurre il traffico PrimeLAN; gli **scenari** restano più reattivi perché guidano il pannello allarme. Puoi comunque cambiare ogni valore nelle opzioni.
+ℹ️ Quando usi **entrambe** le modalità di integrazione, il **GSM** parte con un **default più lento (60s)** per ridurre il traffico PrimeLAN. Puoi comunque cambiare ogni valore nelle opzioni.
 
 ## Pannello allarme
 L'integrazione crea un'entità `alarm_control_panel` per inserire/disinserire l'impianto. Un comando può essere eseguito in **due modi**, che si differenziano per una cosa importante: cosa succede con **zone/finestre aperte**.
 
-- **Scenario** (via PrimeLAN): attiva uno **scenario** della centrale. Lo scenario applica i **controlli della centrale**, quindi con una zona aperta non auto-escludibile **si rifiuta di armare e avvisa**. È l'equivalente del comportamento di sdomotica.
+- **Scenario**: attiva uno **scenario** della centrale. Lo scenario applica i **controlli della centrale**, quindi con una zona aperta non auto-escludibile **si rifiuta di armare e avvisa**. È l'equivalente del comportamento di sdomotica.
 - **Aree** (via Native): agisce **direttamente sulle aree**, **forzando l'inserimento** (bypassa il controllo dello scenario). Le zone auto-escludibili vengono escluse; quelle non auto-escludibili vengono comunque segnalate/bloccate dalla centrale. È **quasi istantaneo** (tutto locale). Permette di **mescolare le modalità** (alcune aree in Totale, altre in Istantaneo nello stesso comando), cosa che molti scenari non fanno.
 
 ### Come si configura
@@ -142,13 +151,13 @@ Esempio tipico (entrambe le modalità):
 
 > **Consiglio per il disinserimento.** Con entrambe le modalità attive, per **Disattivato** scegli **«➜ Tutte le aree disinserite»** invece dello scenario *Spento*: il comando passa dal protocollo Native anziché da PrimeLAN ed è sensibilmente più rapido (nelle prove circa 2 secondi contro 4,5–6). Lo scenario *Spento* serve solo se sulla centrale gli hai collegato altre azioni.
 
-> Solo Native → non ci sono scenari: *Pannello allarme* mostra l'elenco dei comandi e ognuno apre direttamente il form aree. Solo PrimeLAN → le tendine contengono solo scenari.
+> Solo Native → il pannello usa le aree (gli scenari ci sono come pulsanti): *Pannello allarme* mostra l'elenco dei comandi e ognuno apre direttamente il form aree. Solo PrimeLAN → le tendine contengono solo scenari.
 
 Le aree non elencate restano disinserite. Lo **stato** mostrato in HA: un'area in allarme → *triggered*; altrimenti, se un comando a aree combacia esattamente con lo stato attuale lo mostra, altrimenti vale lo scenario attivo, altrimenti *disinserito*/*custom bypass*.
 
 **Attivazione uscite.** Un comando a aree può anche attivare **una o più uscite** (es. "Chiusura casa" per chiudere le persiane); la centrale rilascia da sola le uscite monostabili. Per i comandi a scenario ci pensa lo scenario stesso, quindi il campo uscite vale solo quando il comando è a aree.
 
-**Zone autoescludibili.** Con la modalità PrimeLAN l'attivazione di uno scenario non avviene se una zona autoescludibile è aperta. Se usi zone autoescludibili, configura quel comando con *Aree personalizzate…* (richiede la modalità Native): con la sola PrimeLAN non c'è alternativa.
+**Zone autoescludibili.** L'attivazione di uno scenario non avviene se una zona autoescludibile è aperta. Se usi zone autoescludibili, configura quel comando con *Aree personalizzate…* (richiede la modalità Native): con la sola PrimeLAN non c'è alternativa.
 
 ### Quale pannello viene creato
 - **Solo Native** → blocchi **a aree** (niente campo Scenario).

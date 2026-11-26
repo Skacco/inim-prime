@@ -458,7 +458,31 @@ class InimPrimeOptionsFlowHandler(OptionsFlowWithReload):
                 as_section=False,
             )
         )
-        return self.async_show_form(step_id="scan", data_schema=schema, last_step=False)
+        return self.async_show_form(
+            step_id="scan", data_schema=schema, last_step=False,
+            description_placeholders={"sources": self._scan_sources_text()},
+        )
+
+    def _scan_sources_text(self) -> str:
+        """Where the data comes from, for the configured modes only."""
+        italian = (self.hass.config.language or "").startswith("it")
+        if self._has_native and self._has_primelan:
+            return (
+                "Zone, aree, uscite, scenari, guasti ed eventi arrivano dal Native; il GSM dalla PrimeLAN "
+                "e parte più lento (60s) per ridurre il traffico."
+                if italian else
+                "Zones, partitions, outputs, scenarios, faults and events come from Native; GSM from PrimeLAN, "
+                "which starts slower (60s) to reduce traffic."
+            )
+        if self._has_native:
+            return (
+                "Tutti i dati arrivano dal protocollo nativo (locale, veloce)."
+                if italian else "All data comes from the native protocol (local, fast)."
+            )
+        return (
+            "Tutti i dati arrivano dalla PrimeLAN (Web API)."
+            if italian else "All data comes from PrimeLAN (Web API)."
+        )
 
     # --- Shutters (only shown when the panel has shutter modules) -------
     async def async_step_shutters(self, user_input: dict[str, Any] | None = None):

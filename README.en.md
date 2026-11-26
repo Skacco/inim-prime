@@ -19,20 +19,21 @@ It exposes:
 - **timers**
 - **thermostats** (temperature sensors)
 - **roller shutters** (driven through the panel's command outputs)
+- **scenarios** (one button per scenario + "Active scenario" sensor)
+- **system faults** and supply voltage
+- the panel's **event log** (type, where and who, as in PrimeLAN; commands from Home Assistant show up as user "Home Assistant")
 
 It only needs the local protocol port to be reachable and its password. It does **not** need the PrimeLAN board.
 
 ### PrimeLAN — official Inim Web API
-Uses the **official Inim Web API** exposed by the **PrimeLAN** network board. It adds the features the local protocol does not expose:
-- **scenarios** (one button per scenario + "Active scenario" sensor)
+Uses the **official Inim Web API** exposed by the **PrimeLAN** network board. On its own it covers zones, partitions, outputs, scenarios, faults and the event log; together with Native it adds what the local protocol does not expose:
 - **GSM status** (operator, signal strength, credit)
-- **system faults**
-- the panel's **event log**
+- **realtime push** (webhook, optional)
 
 It requires the **PrimeLAN network board** installed in the panel.
 
 ### Both (recommended)
-You enable the two integration modes together: **Native** does the fast local work (zones, partitions, outputs, shutters, thermostats, timers), **PrimeLAN** adds scenarios, GSM, faults and the log. The Home Assistant **alarm panel** joins the two worlds: it reads the state from the partitions and sends arm/disarm commands through the PrimeLAN **scenarios**.
+You enable the two integration modes together: **Native** does all the fast local work (zones, partitions, outputs, shutters, thermostats, timers, scenarios, faults and the log), **PrimeLAN** adds GSM and realtime push. The Home Assistant **alarm panel** combines scenarios and partitions: for each command you pick a scenario or a set of partitions.
 
 ## Firmware compatibility
 Tested with panels on both **firmware 4.x** and **firmware 5.x**.
@@ -113,16 +114,24 @@ Click the gear icon next to the panel. You can configure:
 Maximum number of events downloaded when new logs are detected. The default value is recommended; the integration automatically downloads more if needed. It is not real time (fetching is asynchronous).
 
 ## Scan intervals
-How often Home Assistant polls the panel (lower values = more traffic). Each field shows the **integration mode** used: **Zones / Partitions / Outputs** are read from **Native** if configured (local, fast), otherwise from **PrimeLAN**; **GSM / Faults / Log events / Scenarios** are **PrimeLAN only**.
+How often Home Assistant polls the panel (lower values = more traffic). The screen only shows the fields of the configured modes:
+
+| Field | Native only | PrimeLAN only | Both |
+|---|---|---|---|
+| Zones, partitions, outputs | ✅ | ✅ | ✅ |
+| Scenarios, faults, events | ✅ | ✅ | ✅ |
+| GSM | — | ✅ | ✅ |
+
+With Native configured, zones, partitions, outputs, scenarios, faults and events come from Native; GSM always comes from PrimeLAN.
 
 ⚠️ The **Native** mode supports much lower intervals than PrimeLAN for zones, partitions and outputs (local polling).
 
-ℹ️ When you use **both** integration modes, "live" data comes from Native, so the **PrimeLAN-only** pollers start with a **slower default (60s for GSM, faults and log events)** to reduce PrimeLAN traffic; **scenarios** stay more responsive because they drive the alarm panel. You can still change every value in the options.
+ℹ️ When you use **both** integration modes, **GSM** starts with a **slower default (60s)** to reduce PrimeLAN traffic. You can still change every value in the options.
 
 ## Alarm panel
 The integration creates an `alarm_control_panel` entity to arm/disarm the system. A command can be executed in **two ways**, which differ in one important thing: what happens with **open zones/windows**.
 
-- **Scenario** (through PrimeLAN): activates a panel **scenario**. The scenario applies the **panel's checks**, so with an open zone that is not auto-bypassable it **refuses to arm and warns you**. It is the equivalent of sdomotica's behaviour.
+- **Scenario**: activates a panel **scenario**. The scenario applies the **panel's checks**, so with an open zone that is not auto-bypassable it **refuses to arm and warns you**. It is the equivalent of sdomotica's behaviour.
 - **Partitions** (through Native): acts **directly on the partitions**, **forcing the arming** (it bypasses the scenario check). Auto-bypassable zones are bypassed; non auto-bypassable ones are still reported/blocked by the panel. It is **almost instant** (all local). It lets you **mix modes** (some partitions in Total, others in Instant in the same command), which many scenarios don't do.
 
 ### How to configure it
@@ -142,13 +151,13 @@ Typical example (both modes):
 
 > **Tip for disarming.** With both modes active, for **Disarmed** pick **“➜ All partitions disarmed”** rather than the scenario *Off*: the command goes through the Native protocol instead of PrimeLAN and is noticeably faster (about 2 seconds versus 4.5–6 in testing). The scenario *Off* is only needed if you tied other actions to it on the panel.
 
-> Native only → there are no scenarios: *Alarm panel* shows the list of commands and each one opens the partitions form directly. PrimeLAN only → the dropdowns contain scenarios only.
+> Native only → the panel uses partitions (scenarios are there as buttons): *Alarm panel* shows the list of commands and each one opens the partitions form directly. PrimeLAN only → the dropdowns contain scenarios only.
 
 Partitions not listed stay disarmed. The **state** shown in HA: a partition in alarm → *triggered*; otherwise, if a partitions command matches the current state exactly it shows that, otherwise the active scenario applies, otherwise *disarmed*/*custom bypass*.
 
 **Output activation.** A partitions command can also activate **one or more outputs** (e.g. "Close house" to close the shutters); the panel releases monostable outputs by itself. For scenario commands the scenario itself takes care of it, so the outputs field only applies when the command uses partitions.
 
-**Auto-bypassable zones.** With the PrimeLAN mode a scenario is not activated if an auto-bypassable zone is open. If you use auto-bypassable zones, configure that command with *Custom partitions…* (requires the Native mode): with PrimeLAN alone there is no alternative.
+**Auto-bypassable zones.** A scenario is not activated if an auto-bypassable zone is open. If you use auto-bypassable zones, configure that command with *Custom partitions…* (requires the Native mode): with PrimeLAN alone there is no alternative.
 
 ### Which panel is created
 - **Native only** → **partition** blocks (no Scenario field).

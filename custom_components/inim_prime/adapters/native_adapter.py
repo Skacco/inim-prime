@@ -1,11 +1,10 @@
 """Adapter that exposes inim.prime.native.Client through the unified interface.
 
-Only wraps what the native gateway currently supports: zones (status +
-bypass), partitions (status + arming + alarm-memory reset), and outputs
-(on/off only, no dimming). GSM, system faults, log events and scenarios are
-not implemented in the native library yet, so this adapter simply has no
-methods for them -- InimPrimeGateway is what decides whether those features
-are available at all (gated on whether PrimelanAdapter is configured).
+Zones (status + bypass), partitions (status + arming + alarm-memory reset)
+and outputs (on/off only, no dimming) come from the native library. Timers,
+thermostats, scenarios, system faults and the event log are read here with
+the panel's own commands and memory tables (see native_extras). GSM is
+PrimeLAN only.
 """
 from __future__ import annotations
 
@@ -38,6 +37,10 @@ from inim.prime.native.models.terminals import (
     Terminal as NativeTerminal,
 )
 from ..models.timers import UnifiedTimer
+from ..models.scenarios import UnifiedScenario
+from ..models.system_faults import UnifiedSystemFaults
+from ..models.log_events import UnifiedLogEvent
+from . import native_extras as extras
 from ..models.outputs import (
     UnifiedOutput,
 )
@@ -249,6 +252,7 @@ def matches_periodic_drop_cadence(wall_time: float) -> bool:
 # are reading the timer-label table and not, on another firmware layout, the
 # codes or scenario labels.
 _DEFAULT_TIMER_SLOT = re.compile(r"(?i)^TIMER\s+\d+$")
+_DEFAULT_SCENARIO = re.compile(r"(?i)^SCENARIO\s+\d+$")
 
 
 def _bit(mask: bytes, index: int) -> bool:
@@ -278,6 +282,13 @@ class NativeAdapter:
         "_timers",
         "_thermostat_names",
         "_thermostats",
+        "_label_pointers",
+        "_labels",
+        "_scenario_labels",
+        "_programmed_scenarios",
+        "_scenarios",
+        "_system_faults",
+        "_event_types",
     )
 
     def __init__(self, client: NativeClient, *, connected: bool = False) -> None:
@@ -315,6 +326,13 @@ class NativeAdapter:
         self._timers: dict[int, UnifiedTimer] = {}
         self._thermostat_names: tuple[dict[int, str], dict[int, str]] | None = None
         self._thermostats: dict = {}
+        self._label_pointers: dict[str, int] | None = None
+        self._labels: dict[tuple[str, int], str] = {}
+        self._scenario_labels: dict[int, str] | None = None
+        self._programmed_scenarios: frozenset[int] | None = None
+        self._scenarios: dict[int, UnifiedScenario] = {}
+        self._system_faults: UnifiedSystemFaults | None = None
+        self._event_types: list | None = None
 
     @property
     def password_rejected(self) -> bool:
@@ -698,6 +716,204 @@ class NativeAdapter:
     @property
     def thermostats(self) -> dict:
         return self._thermostats
+
+    # ------------------------------------------------------------------
+    # Scenarios, system faults and event log (see native_extras)
+    # ------------------------------------------------------------------
+    async def _command(self, payload: bytes, length: int) -> bytes:
+        async with self._client._lock:
+            return await self._client._protocol.exchange_payload(
+                payload = payload,
+                operation = FrameOperation.COMMAND,
+                response_payload_length = length,
+            )
+
+    async def _label(self, kind: str, index: int) -> str | None:
+        """A name from one of the panel's label tables, read once."""
+        from ..const import NATIVE_LABEL_POINTERS, NATIVE_LABEL_POINTERS_ADDRESS
+        key = (kind, index)
+        if key in self._labels:
+            return self._labels[key]
+        if self._label_pointers is None:
+            raw = await self._read_memory(NATIVE_LABEL_POINTERS_ADDRESS, 72)
+            self._label_pointers = {
+                name: int.from_bytes(raw[offset:offset + 4], "little")
+                for name, offset in NATIVE_LABEL_POINTERS.items()
+            }
+        address = self._label_pointers.get(kind)
+        if not address:
+            return None
+        raw = await self._read_memory(address + index * 16, 16)
+        label = raw.split(b"\x00", 1)[0].replace(b"\xff", b"").decode("latin-1").strip() or None
+        self._labels[key] = label
+        return label
+
+    async def _load_labels(self, kind: str, count: int) -> None:
+        """Read a whole label table at once into the cache."""
+        await self._label(kind, 0)  # loads the pointers
+        address = (self._label_pointers or {}).get(kind)
+        if not address:
+            return
+        raw = await self._read_memory(address, count * 16)
+        for i in range(count):
+            chunk = raw[i * 16:(i + 1) * 16]
+            self._labels[(kind, i)] = (
+                chunk.split(b"\x00", 1)[0].replace(b"\xff", b"").decode("latin-1").strip() or None
+            )
+
+    @property
+    def scenarios(self) -> MappingProxyType[int, UnifiedScenario]:
+        return MappingProxyType(self._scenarios)
+
+    async def update_scenarios(self) -> MappingProxyType[int, UnifiedScenario]:
+        from ..const import NATIVE_SCENARIOS_LENGTH
+        async def _do() -> MappingProxyType[int, UnifiedScenario]:
+            if self._programmed_scenarios is None:
+                answer = await self._command(extras.scenarios_payload(programmed = True), NATIVE_SCENARIOS_LENGTH)
+                self._programmed_scenarios = extras.parse_scenario_mask(answer)
+            if self._scenario_labels is None:
+                await self._load_labels("scenario", 50)
+                labels = {}
+                for sid in range(50):
+                    if self._programmed_scenarios and sid not in self._programmed_scenarios:
+                        continue
+                    label = await self._label("scenario", sid)
+                    # without the programmed list, skip the default names
+                    if not self._programmed_scenarios and (not label or _DEFAULT_SCENARIO.match(label)):
+                        continue
+                    labels[sid] = label or f"Scenario {sid + 1}"
+                self._scenario_labels = labels
+            answer = await self._command(extras.scenarios_payload(programmed = False), NATIVE_SCENARIOS_LENGTH)
+            active = extras.parse_scenario_mask(answer)
+            self._scenarios = {
+                sid: UnifiedScenario(sid, label, sid in active)
+                for sid, label in self._scenario_labels.items()
+            }
+            return self.scenarios
+        return await self._call_with_reconnect(_do, kind = "scenarios")
+
+    async def activate_scenario(self, scenario_id: int) -> None:
+        from ..const import NATIVE_SCENARIO_ACTIVATE_LENGTH, NATIVE_SCENARIO_PREPARE_LENGTH
+        if not 0 <= scenario_id < 50:
+            raise ValueError(f"Invalid scenario {scenario_id}")
+
+        async def _do() -> None:
+            # the same two commands, in the same order, as the Inim app
+            await self._command(extras.scenario_prepare_payload(scenario_id), NATIVE_SCENARIO_PREPARE_LENGTH)
+            await self._command(extras.scenario_activate_payload(scenario_id), NATIVE_SCENARIO_ACTIVATE_LENGTH)
+        await self._call_command(_do, ("scenario", scenario_id))
+
+    @property
+    def system_faults(self) -> UnifiedSystemFaults | None:
+        return self._system_faults
+
+    async def update_system_faults(self) -> UnifiedSystemFaults:
+        from inim.prime.primelan.models.system_faults import SystemFault as PrimelanSystemFault
+        from .primelan_adapter import _SYSTEM_FAULT_MAP
+        from ..const import NATIVE_SYSTEM_STATUS_LENGTH, NATIVE_SYSTEM_STATUS_OPERATION
+
+        async def _do() -> UnifiedSystemFaults:
+            answer = await self._command(
+                extras.command_payload(NATIVE_SYSTEM_STATUS_OPERATION), NATIVE_SYSTEM_STATUS_LENGTH,
+            )
+            bits, voltage = extras.parse_system_status(answer)
+            faults = frozenset(
+                _SYSTEM_FAULT_MAP[fault] for fault in PrimelanSystemFault
+                if bits >> fault.value & 1 and fault in _SYSTEM_FAULT_MAP
+            )
+            self._system_faults = UnifiedSystemFaults(supply_voltage = voltage, faults = faults)
+            return self._system_faults
+        return await self._call_with_reconnect(_do, kind = "system_faults")
+
+    async def _load_event_types(self) -> list:
+        from ..const import NATIVE_LOG_TABLES_LENGTH, NATIVE_LOG_TABLES_OPERATION, NATIVE_EVENT_TYPE_SIZE
+        if self._event_types is None:
+            answer = await self._command(
+                extras.command_payload(NATIVE_LOG_TABLES_OPERATION), NATIVE_LOG_TABLES_LENGTH,
+            )
+            address, size = extras.parse_log_tables(answer)
+            table = await self._read_memory(address, size)
+            await self._label("event_text", 0)  # loads the pointers
+            texts_address = (self._label_pointers or {}).get("event_text")
+            count = size // NATIVE_EVENT_TYPE_SIZE
+            texts = await self._read_memory(texts_address, count * 16) if texts_address else b""
+            self._event_types = extras.parse_event_types(table, texts)
+            # the names most events use, in a few reads
+            for kind, count in (("area", 30), ("keypad", 30), ("scenario", 50)):
+                await self._load_labels(kind, count)
+        return self._event_types
+
+    async def _object_label(self, kind: str | None, index: int) -> str:
+        if kind == "user" and index == 0xFF:
+            from ..const import NATIVE_NO_USER_LABEL
+            return NATIVE_NO_USER_LABEL
+        label = await self._label(kind, index) if kind else None
+        return label or str(index + 1)
+
+    async def get_log_events(self, limit: int) -> list[UnifiedLogEvent]:
+        """The newest `limit` events, oldest first, worded like PrimeLAN's."""
+        from homeassistant.util import dt as dt_util
+        from ..const import (
+            NATIVE_EVENT_OBJECT_KINDS, NATIVE_LOG_INFO_LENGTH, NATIVE_LOG_INFO_OPERATION,
+            NATIVE_REMOTE_LABEL,
+        )
+
+        async def _do() -> list[UnifiedLogEvent]:
+            types = await self._load_event_types()
+            info = extras.parse_log_info(await self._command(
+                extras.command_payload(NATIVE_LOG_INFO_OPERATION), NATIVE_LOG_INFO_LENGTH,
+            ))
+            if not info.capacity or not info.record_size:
+                return []
+            indexes = extras.record_indexes(info, limit)
+            raws: dict[int, bytes] = {}
+            for first, count in extras.contiguous_runs(indexes):
+                block = await self._read_memory(
+                    info.address + first * info.record_size, count * info.record_size,
+                )
+                for i in range(count):
+                    raws[first + i] = block[i * info.record_size:(i + 1) * info.record_size]
+            events: list[UnifiedLogEvent] = []
+            for index in indexes:
+                record = extras.parse_record(index, raws.get(index, b""))
+                if record is None:
+                    continue
+                found = extras.find_event_type(types, record.code)
+                if found is None:
+                    continue
+                event_type, offset = found
+                kind = NATIVE_EVENT_OBJECT_KINDS.get(event_type.kind)
+                text = event_type.text
+                location = None
+                if kind in ("user", "scenario"):
+                    location = await self._object_label(kind, offset)
+                    text = text.strip()
+                elif event_type.count > 1:
+                    text = f"{text} - {await self._object_label(kind, offset)}"
+                else:
+                    text = text.strip()
+                if extras.is_restore(record):
+                    text = f"Fine {text}"
+                user = extras.record_user(event_type, record)
+                if user is not None and location is None:
+                    location = await self._object_label("user", user)
+                source = extras.record_source(event_type, record)
+                agent = None
+                if source == -1:
+                    agent = NATIVE_REMOTE_LABEL
+                elif source is not None:
+                    agent = await self._object_label("keypad", source)
+                events.append(UnifiedLogEvent(
+                    id = record.index,
+                    # panel local time
+                    timestamp = record.timestamp.replace(tzinfo = dt_util.get_default_time_zone()),
+                    type = text,
+                    agent = agent,
+                    location = location,
+                    value = None,
+                ))
+            return events
+        return await self._call_with_reconnect(_do, kind = "log_events")
 
     @property
     def serial_number(self) -> Optional[str]:

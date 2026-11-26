@@ -51,9 +51,10 @@ async def test_primelan_only_uses_primelan_for_outputs():
     assert primelan.calls == [("set", 1, True, 50)]
 
 
-async def test_native_only_has_outputs_but_no_scenarios():
+async def test_native_only_has_outputs_scenarios_faults_and_events():
     gw = InimPrimeGateway(native=FakeBackend("native"))
-    assert gw.supports_outputs and not gw.supports_scenarios
+    assert gw.supports_outputs and gw.supports_scenarios
+    assert gw.supports_system_faults and gw.supports_log_events and not gw.supports_gsm
 
 
 def test_outer_frame_hidden_with_primelan():

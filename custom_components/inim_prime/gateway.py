@@ -110,11 +110,11 @@ class InimPrimeGateway:
 
     @property
     def supports_system_faults(self) -> bool:
-        return self._primelan is not None
+        return self._native is not None or self._primelan is not None
 
     @property
     def supports_log_events(self) -> bool:
-        return self._primelan is not None or (
+        return self._native is not None or self._primelan is not None or (
             self._smartliving is not None and self._smartliving.has_event_log
         )
 
@@ -124,7 +124,7 @@ class InimPrimeGateway:
 
     @property
     def supports_scenarios(self) -> bool:
-        return self._primelan is not None or self._smartliving is not None
+        return self._native is not None or self._primelan is not None or self._smartliving is not None
 
     @property
     def supports_timers(self) -> bool:
@@ -344,6 +344,8 @@ class InimPrimeGateway:
     def scenarios(self) -> MappingProxyType[int, UnifiedScenario] | None:
         if self._smartliving is not None:
             return self._smartliving.scenarios
+        if self._native is not None:
+            return self._native.scenarios
         return self._primelan.scenarios if self._primelan is not None else None
 
     @property
@@ -352,6 +354,8 @@ class InimPrimeGateway:
 
     @property
     def system_faults(self) -> UnifiedSystemFaults | None:
+        if self._native is not None:
+            return self._native.system_faults
         return self._primelan.system_faults if self._primelan is not None else None
 
     @property
@@ -455,8 +459,12 @@ class InimPrimeGateway:
             if not force:
                 await self._wait_polling_released()
             return await self._smartliving.update_scenarios()
+        if self._native is not None:
+            if not force:
+                await self._wait_polling_released()
+            return await self._native.update_scenarios()
         if self._primelan is None:
-            raise InimPrimeFeatureNotSupportedError("Scenarios require PrimeLAN")
+            raise InimPrimeFeatureNotSupportedError("Scenarios require Native or PrimeLAN")
         if not force:
             await self._wait_polling_released()
         return await self._primelan.update_scenarios()
@@ -468,8 +476,11 @@ class InimPrimeGateway:
         return await self._primelan.update_gsm()
 
     async def update_system_faults(self) -> UnifiedSystemFaults:
+        if self._native is not None:
+            await self._wait_polling_released()
+            return await self._native.update_system_faults()
         if self._primelan is None:
-            raise InimPrimeFeatureNotSupportedError("System faults require PrimeLAN")
+            raise InimPrimeFeatureNotSupportedError("System faults require Native or PrimeLAN")
         await self._wait_polling_released()
         return await self._primelan.update_system_faults()
 
@@ -478,8 +489,11 @@ class InimPrimeGateway:
         if self._smartliving is not None:
             await self._wait_polling_released()
             return await self._smartliving.get_log_events(limit)
+        if self._native is not None:
+            await self._wait_polling_released()
+            return await self._native.get_log_events(limit)
         if self._primelan is None:
-            raise InimPrimeFeatureNotSupportedError("Log events require PrimeLAN")
+            raise InimPrimeFeatureNotSupportedError("Log events require Native or PrimeLAN")
         await self._wait_polling_released()
         return await self._primelan.get_log_events(limit)
 
@@ -562,6 +576,9 @@ class InimPrimeGateway:
         if self._smartliving is not None:
             await self._smartliving.activate_scenario(scenario_id)
             return
+        if self._native is not None:
+            await self._native.activate_scenario(scenario_id)
+            return
         if self._primelan is None:
-            raise InimPrimeFeatureNotSupportedError("Scenarios require PrimeLAN")
+            raise InimPrimeFeatureNotSupportedError("Scenarios require Native or PrimeLAN")
         await self._primelan.activate_scenario(scenario_id)

@@ -4,7 +4,7 @@
     "step": {
       "user": {
         "title": "Configure INIM Prime",
-        "description": "Choose which integration mode(s) to use for this panel.\n\n• Native — zones, partitions, arm/disarm, outputs, timers and roller shutters. Fast local polling.\n• PrimeLAN — adds scenarios, GSM status, system faults and the event log.\n• Both — all of the above (Native is used where it can, PrimeLAN for the rest).\n\nNative only still covers the essentials; PrimeLAN requires the PrimeLAN card and its API key.\n• SmartLiving (beta) — Inim SmartLiving panels with a SmartLAN/SI or SmartLAN/G board, locally.",
+        "description": "Choose which integration mode(s) to use for this panel.\n\n• Native — zones, partitions, arm/disarm, outputs, timers, roller shutters, scenarios, faults and the event log. Fast local polling.\n• PrimeLAN — adds GSM status and realtime notifications.\n• Both — all of the above (Native is used where it can, PrimeLAN for the rest).\n\nNative only still covers the essentials; PrimeLAN requires the PrimeLAN card and its API key.\n• SmartLiving (beta) — Inim SmartLiving panels with a SmartLAN/SI or SmartLAN/G board, locally.",
         "menu_options": {
           "native_only": "Native only",
           "primelan_only": "PrimeLAN only",
@@ -64,7 +64,7 @@
       },
       "reconfigure": {
         "title": "Reconfigure INIM Prime",
-        "description": "Here you change the integration mode (Native / PrimeLAN / Both) and the connection settings.\n\nChoose which integration mode(s) to use for this panel.\n\n• Native — zones, partitions, arm/disarm, outputs, timers and roller shutters. Fast local polling.\n• PrimeLAN — adds scenarios, GSM status, system faults and the event log.\n• Both — all of the above (Native is used where it can, PrimeLAN for the rest).\n\nNative only still covers the essentials; PrimeLAN requires the PrimeLAN card and its API key.",
+        "description": "Here you change the integration mode (Native / PrimeLAN / Both) and the connection settings.\n\nChoose which integration mode(s) to use for this panel.\n\n• Native — zones, partitions, arm/disarm, outputs, timers, roller shutters, scenarios, faults and the event log. Fast local polling.\n• PrimeLAN — adds GSM status and realtime notifications.\n• Both — all of the above (Native is used where it can, PrimeLAN for the rest).\n\nNative only still covers the essentials; PrimeLAN requires the PrimeLAN card and its API key.",
         "menu_options": {
           "reconfigure_native_only": "Native only",
           "reconfigure_primelan_only": "PrimeLAN only",
@@ -129,24 +129,24 @@
         "sections": {
           "scan_intervals": {
             "name": "Scan intervals",
-            "description": "How often Home Assistant polls the panel (lower values = more traffic). Each entry shows the integration mode: Native (local protocol, fast) or PrimeLAN (Web API). Zones, partitions and outputs use the active integration mode (Native or PrimeLAN); GSM, faults, event log and scenarios are PrimeLAN only. With both integration modes the PrimeLAN-only pollers start slower (60s) to reduce traffic. See the README.\nNote: if you've just added or removed Native, the defaults below have been adjusted accordingly.",
+            "description": "How often Home Assistant polls the panel (lower values = more traffic). With Native all data comes from the local protocol; with PrimeLAN alone from the Web API; with both, GSM comes from PrimeLAN and starts slower (60s). See the README.\nNote: if you've just added or removed Native, the defaults below have been adjusted accordingly.",
             "data": {
-              "zones": "Zones Scan Interval (Native/PrimeLAN)",
-              "partitions": "Partitions Scan Interval (Native/PrimeLAN)",
-              "gsm": "GSM Scan Interval (PrimeLAN)",
-              "system_faults": "System Faults Scan Interval (PrimeLAN)",
-              "panel_log_events": "Panel Log Events Scan Interval (PrimeLAN)",
-              "outputs": "Outputs Scan Interval (Native/PrimeLAN)",
-              "scenarios": "Scenarios Scan Interval (PrimeLAN)"
+              "zones": "Zones Scan Interval",
+              "partitions": "Partitions Scan Interval",
+              "gsm": "GSM Scan Interval",
+              "system_faults": "System Faults Scan Interval",
+              "panel_log_events": "Panel Log Events Scan Interval",
+              "outputs": "Outputs Scan Interval",
+              "scenarios": "Scenarios Scan Interval"
             },
             "data_description": {
-              "zones": "How often Home Assistant fetches zone status. Integration mode: Native/PrimeLAN.",
-              "partitions": "How often Home Assistant fetches partition status. Integration mode: Native/PrimeLAN.",
-              "gsm": "How often Home Assistant fetches GSM status. PrimeLAN only.",
-              "system_faults": "How often Home Assistant fetches system faults. PrimeLAN only.",
-              "panel_log_events": "How often Home Assistant fetches new panel log events. PrimeLAN only.",
-              "outputs": "How often Home Assistant reads the outputs status. Integration mode: Native/PrimeLAN.",
-              "scenarios": "How often Home Assistant reads which scenario is active. PrimeLAN only."
+              "zones": "How often Home Assistant fetches zone status.",
+              "partitions": "How often Home Assistant fetches partition status.",
+              "gsm": "How often Home Assistant fetches GSM status.",
+              "system_faults": "How often Home Assistant fetches system faults.",
+              "panel_log_events": "How often Home Assistant fetches new panel log events.",
+              "outputs": "How often Home Assistant reads the outputs status.",
+              "scenarios": "How often Home Assistant reads which scenario is active."
             }
           },
           "alarm_panel": {
@@ -377,24 +377,24 @@
       },
       "scan": {
         "title": "Scan intervals",
-        "description": "How often Home Assistant polls the panel (lower values = more traffic). Each entry shows the integration mode: Native (local protocol, fast) or PrimeLAN (Web API). Zones, partitions and outputs use the active integration mode (Native or PrimeLAN); GSM, faults, event log and scenarios are PrimeLAN only. With both integration modes the PrimeLAN-only pollers start slower (60s) to reduce traffic. See the README.",
+        "description": "How often Home Assistant polls the panel (lower values = more traffic). {sources} See the README.",
         "data": {
-          "zones": "Zones Scan Interval (Native/PrimeLAN)",
-          "partitions": "Partitions Scan Interval (Native/PrimeLAN)",
-          "gsm": "GSM Scan Interval (PrimeLAN)",
-          "system_faults": "System Faults Scan Interval (PrimeLAN)",
-          "panel_log_events": "Panel Log Events Scan Interval (PrimeLAN)",
-          "outputs": "Outputs Scan Interval (Native/PrimeLAN)",
-          "scenarios": "Scenarios Scan Interval (PrimeLAN)"
+          "zones": "Zones Scan Interval",
+          "partitions": "Partitions Scan Interval",
+          "gsm": "GSM Scan Interval",
+          "system_faults": "System Faults Scan Interval",
+          "panel_log_events": "Panel Log Events Scan Interval",
+          "outputs": "Outputs Scan Interval",
+          "scenarios": "Scenarios Scan Interval"
         },
         "data_description": {
-          "zones": "How often Home Assistant fetches zone status. Integration mode: Native/PrimeLAN.",
-          "partitions": "How often Home Assistant fetches partition status. Integration mode: Native/PrimeLAN.",
-          "gsm": "How often Home Assistant fetches GSM status. PrimeLAN only.",
-          "system_faults": "How often Home Assistant fetches system faults. PrimeLAN only.",
-          "panel_log_events": "How often Home Assistant fetches new panel log events. PrimeLAN only.",
-          "outputs": "How often Home Assistant reads the outputs status. Integration mode: Native/PrimeLAN.",
-          "scenarios": "How often Home Assistant reads which scenario is active. PrimeLAN only."
+          "zones": "How often Home Assistant fetches zone status.",
+          "partitions": "How often Home Assistant fetches partition status.",
+          "gsm": "How often Home Assistant fetches GSM status.",
+          "system_faults": "How often Home Assistant fetches system faults.",
+          "panel_log_events": "How often Home Assistant fetches new panel log events.",
+          "outputs": "How often Home Assistant reads the outputs status.",
+          "scenarios": "How often Home Assistant reads which scenario is active."
         }
       },
       "shutters": {
