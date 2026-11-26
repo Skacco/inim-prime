@@ -20,11 +20,17 @@ _REDACTED_PANEL = {"serial_number"}
 _REDACTED_LOG_EVENTS = {"agent"}
 
 
+def _log_event(event) -> dict[str, Any]:
+    data = asdict(event) if is_dataclass(event) else dict(event)
+    # An event that says where it came from (keypad, remote) has the user in
+    # "location"; on the others it is a zone or scenario name and stays.
+    if data.get("agent") and data.get("location"):
+        data["location"] = "**REDACTED**"
+    return data
+
+
 def _log_events(events) -> list[dict[str, Any]]:
-    return async_redact_data(
-        [asdict(event) if is_dataclass(event) else dict(event) for event in events],
-        _REDACTED_LOG_EVENTS,
-    )
+    return async_redact_data([_log_event(event) for event in events], _REDACTED_LOG_EVENTS)
 
 
 async def async_get_config_entry_diagnostics(

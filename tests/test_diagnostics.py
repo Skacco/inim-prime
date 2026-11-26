@@ -75,7 +75,26 @@ async def test_panel_device_diagnostics_redacts_serial_and_agent(monkeypatch):
 
     assert result["serial_number"] == REDACTED
     assert result["log_events"][0]["agent"] == REDACTED
+    assert result["log_events"][0]["location"] == REDACTED
     assert result["log_events"][0]["type"] == "Disinserimento"
     text = json_bytes(result).decode()
     assert "Mario Rossi" not in text
     assert "123456" not in text
+
+
+def test_log_events_hide_the_user_but_keep_zone_and_scenario_names():
+    def event(agent, location):
+        return UnifiedLogEvent(
+            id = 1, timestamp = datetime(2026, 11, 26), type = "t",
+            agent = agent, location = location, value = None,
+        )
+
+    result = diagnostics._log_events([
+        event("Da remoto", "Mario"),            # area disarmed by a user
+        event("TAST. GARAGE", "Mario"),         # valid code at a keypad
+        event(None, "Spento"),                  # scenario activated
+    ])
+
+    assert [(e["agent"], e["location"]) for e in result] == [
+        (REDACTED, REDACTED), (REDACTED, REDACTED), (None, "Spento"),
+    ]
