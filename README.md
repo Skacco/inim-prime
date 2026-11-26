@@ -66,10 +66,14 @@ Verifica sempre le operazioni critiche direttamente sulla centrale Inim Prime o 
 # Installazione in Home Assistant
 È il modo consigliato perché gestisce gli aggiornamenti. Il negozio delle integrazioni è ormai integrato in Home Assistant (Marketplace), quindi non serve installare altro.
 
-Apri il **Marketplace**, cerca `Inim` (trovi **Inim Prime & SmartLiving**), aprila e premi `DOWNLOAD`. Alla **prima installazione non serve riavviare**: puoi aggiungere subito l'integrazione (vedi sotto). Il riavvio viene richiesto solo per gli **aggiornamenti** successivi.
+[![Apri in Home Assistant il repository nel Marketplace](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Skacco&repository=inim-prime&category=integration)
+
+Oppure apri il **Marketplace**, cerca `Inim` (trovi **Inim Prime & SmartLiving**), aprila e premi `DOWNLOAD`. Alla **prima installazione non serve riavviare**: puoi aggiungere subito l'integrazione (vedi sotto). Il riavvio viene richiesto solo per gli **aggiornamenti** successivi.
 
 # Configurazione dell'integrazione in Home Assistant
-Vai in `Impostazioni` → `Dispositivi e servizi` → `Aggiungi integrazione`, cerca `Inim Prime`.
+[![Aggiungi l'integrazione al tuo Home Assistant](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=inim_prime)
+
+Oppure vai in `Impostazioni` → `Dispositivi e servizi` → `Aggiungi integrazione`, cerca `Inim`.
 
 ### Scelta della modalità di integrazione
 All'inizio scegli quale modalità di integrazione usare: **Solo Native**, **Solo PrimeLAN** o **Native + PrimeLAN**.
