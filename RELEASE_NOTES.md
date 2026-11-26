@@ -1,3 +1,9 @@
+## Novità 1.2.2
+
+- Rimosse le azioni di debug che scrivono o mandano comandi alla centrale; quelle di lettura sono solo per amministratori.
+- Diagnostica: nascosti numero di serie, webhook e chi inserisce o disinserisce.
+- I nomi e gli ID delle entità modificati dall'utente non vengono più ripristinati all'avvio.
+
 ## Novità 1.2.1
 
 - Corretta la configurazione Native sulle centrali con nomi mai programmati.
