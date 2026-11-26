@@ -15,6 +15,7 @@ from ..models.outputs import UnifiedOutput
 from ..models.partitions import UnifiedArmingStatus, UnifiedPartition, UnifiedPartitionState
 from ..models.scenarios import UnifiedScenario
 from ..models.zones import UnifiedZone, UnifiedZoneState
+from ..smartliving.parsing import plausible_events
 from ..smartliving import (
     AreaState,
     ArmMode,
@@ -82,6 +83,7 @@ class SmartLivingAdapter:
         self._partitions: dict[int, UnifiedPartition] = {}
         self._scenarios: dict[int, UnifiedScenario] = {}
         self._outputs: dict[int, UnifiedOutput] = {}
+        self._event_log = False
         self._refreshed_at: float | None = None
 
     # ------------------------------------------------------------------
@@ -94,6 +96,7 @@ class SmartLivingAdapter:
         except SmartLivingConnectionError as err:
             raise ConnectionError(str(err)) from err
         await self._refresh(force = True)
+        self._event_log = await self._check_event_log()
 
     async def close(self) -> None:
         await self._client.close()
@@ -104,8 +107,24 @@ class SmartLivingAdapter:
 
     @property
     def has_event_log(self) -> bool:
+        return self._event_log
+
+    async def _check_event_log(self) -> bool:
+        """The log address is verified on the 1050 only: elsewhere use it only
+        if what it returns looks like a real log."""
         model = self._client.model
-        return model is not None and model.events
+        if model is None:
+            return False
+        if model.events:
+            return True
+        try:
+            events = await self._client.read_events(5)
+        except SmartLivingError as err:
+            _LOGGER.debug("SmartLiving %s: event log not readable (%s)", model.name, err)
+            return False
+        ok = plausible_events(events, dt_util.now().replace(tzinfo = None))
+        _LOGGER.debug("SmartLiving %s: event log %s", model.name, "found" if ok else "not recognised")
+        return ok
 
     @property
     def serial_number(self) -> str | None:

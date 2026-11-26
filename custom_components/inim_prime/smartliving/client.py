@@ -214,12 +214,13 @@ class Client:
         )
 
     async def read_events(self, count: int = 30) -> list[Event]:
-        """The newest `count` events, newest first. Empty on models whose log
-        layout is not known."""
+        """The newest `count` events, newest first. On models other than the
+        1050 the log address is assumed: check the result with
+        parsing.plausible_events before trusting it."""
         if self._model is None:
             await self.read_panel_info()
         model = self._model
-        if model is None or not model.events:
+        if model is None:
             return []
         raw = await self._protocol.read(BANK_MAIN, EVENT_POINTER_ADDRESS, EVENT_POINTER_LENGTH)
         pointer = raw[0] | (raw[1] << 8)

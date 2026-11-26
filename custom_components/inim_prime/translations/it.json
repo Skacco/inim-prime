@@ -246,6 +246,10 @@
           "password": "Password TCP (se attiva)",
           "pin": "PIN utente"
         }
+      },
+      "smartliving_experimental": {
+        "title": "Modello sperimentale",
+        "description": "La {model} non è ancora stata provata su una centrale vera con questa integrazione: alcune informazioni (aree delle zone, registro eventi, stato di allarme) potrebbero mancare o essere sbagliate.\n\nSe qualcosa non torna, apri una segnalazione allegando la diagnostica dell'integrazione."
       }
     },
     "error": {

@@ -189,6 +189,7 @@ _EPOCH = datetime(2000, 1, 1)
 _AREA_EVENTS = {0x8A, 0x8C, 0x8D, 0x0A, 0x0C, 0x95, 0x96}
 _ZONE_EVENTS = {0x80, 0x00, 0x85, 0x05}
 SCENARIO_EVENT = 0x9E
+KNOWN_EVENT_CODES = _AREA_EVENTS | _ZONE_EVENTS | {SCENARIO_EVENT, 0xBA, 0xC2, 0x42, 0x9B, 0x1B}
 
 
 def event_address(pointer: int, back: int, base: int, length: int) -> int | None:
@@ -223,3 +224,12 @@ def parse_event(raw: bytes, index: int, areas: int) -> Event:
         user=user,
         raw=bytes(raw),
     )
+
+
+def plausible_events(events: list[Event], now: datetime) -> bool:
+    """True when the events look like a real log: known types and dates
+    between 2005 and tomorrow. Used where the log address is not verified."""
+    if not events:
+        return False
+    low, high = datetime(2005, 1, 1), now + timedelta(days=1)
+    return all(e.code in KNOWN_EVENT_CODES and low <= e.timestamp <= high for e in events)

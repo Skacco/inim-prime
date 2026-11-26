@@ -235,3 +235,19 @@ async def test_outputs_and_event_log(hass: HomeAssistant):
     assert events[0].location == "Zona prova 08"
     assert events[1].location == "Casa" and events[1].agent == "Utente 5"
     await hass.config_entries.async_unload(entry.entry_id)
+
+
+async def test_experimental_model_is_flagged_before_creating(hass: HomeAssistant):
+    panel = FakeSmartLiving()
+    panel.memory[(0, 0x004000)] = b"6.09 10100  "
+    with _patched(panel), patch("custom_components.inim_prime.async_setup_entry", return_value=True):
+        result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], {"next_step_id": "smartliving"})
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {"host": "192.0.2.21", "port": 5004, "pin": "123456"},
+        )
+        assert result["step_id"] == "smartliving_experimental"
+        assert result["description_placeholders"]["model"] == "SmartLiving 10100"
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert not panel.commands

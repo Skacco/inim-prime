@@ -227,9 +227,9 @@ class InimPrimeConfigFlow(config_entries.ConfigFlow, domain = DOMAIN):
                     options.hide_unused_partitions = True
                     options.zones_scan_interval = SMARTLIVING_SCAN_INTERVAL_DEFAULT
                     options.partitions_scan_interval = SMARTLIVING_SCAN_INTERVAL_DEFAULT
-                    return self.async_create_entry(
-                        title = f"INIM SmartLiving {config.info.model} ({serial})",
-                        data = {
+                    self._smartliving_entry = {
+                        "title": f"INIM SmartLiving {config.info.model} ({serial})",
+                        "data": {
                             DataKey.SERIAL_NUMBER: serial,
                             DataKey.HOST: host,
                             "smartliving": {
@@ -238,8 +238,13 @@ class InimPrimeConfigFlow(config_entries.ConfigFlow, domain = DOMAIN):
                                 "pin": pin or None,
                             },
                         },
-                        options = options.to_options_dict(),
-                    )
+                        "options": options.to_options_dict(),
+                    }
+                    model = client.model
+                    if model is not None and not model.verified:
+                        self._smartliving_model = model.name
+                        return await self.async_step_smartliving_experimental()
+                    return self.async_create_entry(**self._smartliving_entry)
         defaults = user_input or {}
         schema = vol.Schema({
             vol.Required(DataKey.HOST, default = defaults.get(DataKey.HOST, "")): str,
@@ -474,6 +479,16 @@ class InimPrimeConfigFlow(config_entries.ConfigFlow, domain = DOMAIN):
         return self.async_show_menu(
             step_id = "reconfigure",
             menu_options = await self._reconfigure_menu(),
+        )
+
+    async def async_step_smartliving_experimental(self, user_input: dict[str, Any] | None = None):
+        """Models not tried on a real panel yet: say so before creating the entry."""
+        if user_input is not None:
+            return self.async_create_entry(**self._smartliving_entry)
+        return self.async_show_form(
+            step_id = "smartliving_experimental",
+            data_schema = vol.Schema({}),
+            description_placeholders = {"model": self._smartliving_model},
         )
 
     async def async_step_reconfigure_smartliving(self, user_input: dict[str, Any] | None = None):

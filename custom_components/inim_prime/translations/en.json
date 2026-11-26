@@ -246,6 +246,10 @@
           "password": "TCP password (if enabled)",
           "pin": "User PIN"
         }
+      },
+      "smartliving_experimental": {
+        "title": "Experimental model",
+        "description": "The {model} has not been tried on a real panel with this integration yet: some information (zone areas, event log, alarm state) may be missing or wrong.\n\nIf something looks wrong, open an issue with the integration's diagnostics attached."
       }
     },
     "error": {

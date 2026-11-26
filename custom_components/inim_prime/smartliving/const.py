@@ -53,8 +53,9 @@ OUTPUT_NAMES_POINTER: Final[int] = 0x4028
 # Fixed outputs on every model: relay, OC1, OC2 (command index 0, 1, 2).
 FIXED_OUTPUTS: Final[int] = 3
 
-# Event log (1050, from the integration that first read it): a 4-byte pointer
-# at 0x1FFE, then 9-byte compact events in the names bank, newest first.
+# Event log (read on a 1050 by the integration that first decoded it; assumed
+# the same elsewhere, see plausible_events): a 4-byte pointer at 0x1FFE, then
+# 9-byte compact events in the names bank, newest first.
 EVENT_POINTER_ADDRESS: Final[int] = 0x001FFE
 EVENT_POINTER_LENGTH: Final[int] = 4
 EVENT_LENGTH: Final[int] = 9
@@ -114,7 +115,7 @@ class Model:
     scenario_records: int   # per scenario: one nibble per area (arm modes)
     scenario_record_size: int
     verified: bool          # read on a real panel of this model
-    events: bool = False    # event log layout known
+    events: bool = False    # event log read on a real panel of this model
 
 
 # 1050: read on a SmartLiving 1050 firmware 6.08.
