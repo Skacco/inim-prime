@@ -38,6 +38,7 @@ from .const import (
     OUTPUTS_SCAN_INTERVAL_NATIVE_DEFAULT,
     SCENARIOS_SCAN_INTERVAL_PRIMELAN_DEFAULT,
     SCENARIOS_SCAN_INTERVAL_NATIVE_DEFAULT,
+    PRIMELAN_SCAN_INTERVAL_BOTH_DEFAULT,
     SYSTEM_FAULTS_SCAN_INTERVAL_NATIVE_DEFAULT,
     PANEL_LOG_EVENTS_SCAN_INTERVAL_NATIVE_DEFAULT,
     TIMERS_SCAN_INTERVAL_DEFAULT,
@@ -968,5 +969,22 @@ async def async_migrate_entry(hass: HomeAssistant, entry: InimPrimeConfigEntry) 
             version = 2,
             minor_version = 0,
         )
+
+    if entry.version == 2 and entry.minor_version < 1:
+        # 2.1: with Native, scenarios, faults and the event log come from it.
+        # Intervals still at the old PrimeLAN defaults take the Native ones;
+        # values the user chose stay as they are.
+        options = dict(entry.options)
+        intervals = dict(options.get("scan_intervals") or {})
+        if entry.data.get("native"):
+            for key, old, new in (
+                    ("system_faults", PRIMELAN_SCAN_INTERVAL_BOTH_DEFAULT, SYSTEM_FAULTS_SCAN_INTERVAL_NATIVE_DEFAULT),
+                    ("panel_log_events", PRIMELAN_SCAN_INTERVAL_BOTH_DEFAULT, PANEL_LOG_EVENTS_SCAN_INTERVAL_NATIVE_DEFAULT),
+                    ("scenarios", SCENARIOS_SCAN_INTERVAL_PRIMELAN_DEFAULT, SCENARIOS_SCAN_INTERVAL_NATIVE_DEFAULT),
+            ):
+                if intervals.get(key) == old:
+                    intervals[key] = new
+            options["scan_intervals"] = intervals
+        hass.config_entries.async_update_entry(entry, options = options, minor_version = 1)
 
     return True

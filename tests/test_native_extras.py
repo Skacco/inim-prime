@@ -134,3 +134,27 @@ def test_a_log_read_in_another_form_does_not_replay_old_events():
     last = [ev(0, None), ev(7, None)]                  # as PrimeLAN wrote them
     current = [ev(0, "Home Assistant"), ev(7, "Home Assistant"), ev(9, "Home Assistant")]
     assert [e.timestamp.minute for e in filter_new_log_events(last, current)] == [9]
+
+
+async def test_old_primelan_defaults_move_to_the_native_ones(hass):
+    from pytest_homeassistant_custom_component.common import MockConfigEntry
+    from custom_components.inim_prime import async_migrate_entry
+
+    entry = MockConfigEntry(
+        domain = "inim_prime", version = 2, minor_version = 0,
+        data = {"serial_number": "1", "host": "h", "native": {"port": 6004}, "primelan": {"api_key": "k"}},
+        options = {"scan_intervals": {
+            "gsm": 60000.0, "system_faults": 60000.0, "panel_log_events": 30000.0, "scenarios": 10000.0,
+        }},
+    )
+    entry.add_to_hass(hass)
+
+    assert await async_migrate_entry(hass, entry)
+
+    assert entry.minor_version == 1
+    assert entry.options["scan_intervals"] == {
+        "gsm": 60000.0,                 # still PrimeLAN
+        "system_faults": 10000,         # old default -> Native default
+        "panel_log_events": 30000.0,    # chosen by the user: kept
+        "scenarios": 2000,
+    }
