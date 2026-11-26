@@ -11,7 +11,9 @@ from .const import (
     TERMINAL_RECORD_TYPE_OFFSET,
     ZONE_RECORD_SIZE,
 )
-from .models import AreaState, AreaStatus, PanelInfo, Scenario, ZoneState, ZoneStatus
+from datetime import datetime, timedelta
+
+from .models import AreaState, AreaStatus, Event, PanelInfo, Scenario, ZoneState, ZoneStatus
 
 
 def decode_text(raw: bytes) -> str:
@@ -159,3 +161,65 @@ def parse_serial(raw: bytes) -> str | None:
     """16 ASCII digits, or None when the field is empty or not digits."""
     text = raw.decode("ascii", errors="replace").strip()
     return text if text.isdigit() else None
+
+
+def output_state_layout(zones: int, fixed: int) -> tuple[int, int]:
+    """(first byte, total length) of the output states in the 0x2003 block:
+    after the zone alarm memory, one bit per logical terminal then the fixed
+    outputs (relay, OC1, OC2)."""
+    base = 2 * zones // 8 + 1 + zones // 8 + 1
+    return base, base + (zones + fixed + 7) // 8
+
+
+def parse_output_states(raw: bytes, zones: int, fixed: int, bits: dict[int, int]) -> dict[int, bool]:
+    """Output id -> on, from the 0x2003 block; `bits` maps output id -> state bit."""
+    base, length = output_state_layout(zones, fixed)
+    block = raw[base:length]
+    return {
+        output_id: bool(block[bit // 8] >> (bit % 8) & 1) if bit // 8 < len(block) else False
+        for output_id, bit in bits.items()
+    }
+
+
+def parse_name_pointer(raw: bytes, offset: int) -> int:
+    return raw[offset] | (raw[offset + 1] << 8) if len(raw) > offset + 1 else 0
+
+
+_EPOCH = datetime(2000, 1, 1)
+_AREA_EVENTS = {0x8A, 0x8C, 0x8D, 0x0A, 0x0C, 0x95, 0x96}
+_ZONE_EVENTS = {0x80, 0x00, 0x85, 0x05}
+SCENARIO_EVENT = 0x9E
+
+
+def event_address(pointer: int, back: int, base: int, length: int) -> int | None:
+    """Names-bank address of the event `back` steps before the newest one."""
+    newest = ((pointer - 1) * length + base) & 0xFFFF
+    position = newest - back * length
+    return position if position >= 0 else None
+
+
+def parse_event(raw: bytes, index: int, areas: int) -> Event:
+    seconds = int.from_bytes(raw[0:4], "little")
+    d1, d2, d3, _device, code = raw[4:9]
+    mask = d1 | (d2 << 8)
+    event_areas = frozenset(a + 1 for a in range(areas) if mask >> a & 1)
+    zone = scenario = user = None
+    if code in _ZONE_EVENTS:
+        zone = d3 + 1
+    elif code == SCENARIO_EVENT:
+        scenario = d3 + 1
+        event_areas = frozenset()
+    elif code in _AREA_EVENTS:
+        user = d3
+    else:
+        event_areas = frozenset()
+    return Event(
+        index=index,
+        timestamp=_EPOCH + timedelta(seconds=seconds),
+        code=code,
+        areas=event_areas,
+        zone=zone,
+        scenario=scenario,
+        user=user,
+        raw=bytes(raw),
+    )

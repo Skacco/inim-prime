@@ -114,11 +114,13 @@ class InimPrimeGateway:
 
     @property
     def supports_log_events(self) -> bool:
-        return self._primelan is not None
+        return self._primelan is not None or (
+            self._smartliving is not None and self._smartliving.has_event_log
+        )
 
     @property
     def supports_outputs(self) -> bool:
-        return self._native is not None or self._primelan is not None
+        return self._native is not None or self._primelan is not None or self._smartliving is not None
 
     @property
     def supports_scenarios(self) -> bool:
@@ -317,6 +319,8 @@ class InimPrimeGateway:
                     for oid, o in outputs.items()
                 }
             return MappingProxyType(outputs)
+        if self._smartliving is not None:
+            return self._smartliving.outputs
         return self._primelan.outputs if self._primelan is not None else None
 
     @property
@@ -377,7 +381,7 @@ class InimPrimeGateway:
         return self._preferred.apply_partition_changes(partition_id, **changes)
 
     def apply_output_state(self, output_id: int, state: bool) -> bool:
-        backend = self._native if self._native is not None else self._primelan
+        backend = self._native or self._smartliving or self._primelan
         return backend is not None and backend.apply_output_state(output_id, state)
 
     # ------------------------------------------------------------------
@@ -439,6 +443,8 @@ class InimPrimeGateway:
             if not self.defer_output_labels:
                 await self.load_primelan_output_labels()
             return self.outputs
+        if self._smartliving is not None:
+            return await self._smartliving.update_outputs()
         if self._primelan is not None:
             return await self._primelan.update_outputs()
         raise InimPrimeFeatureNotSupportedError("Outputs require Native or PrimeLAN")
@@ -469,6 +475,9 @@ class InimPrimeGateway:
 
 
     async def get_log_events(self, limit: int) -> list[UnifiedLogEvent]:
+        if self._smartliving is not None:
+            await self._wait_polling_released()
+            return await self._smartliving.get_log_events(limit)
         if self._primelan is None:
             raise InimPrimeFeatureNotSupportedError("Log events require PrimeLAN")
         await self._wait_polling_released()
@@ -540,6 +549,9 @@ class InimPrimeGateway:
         # so commands must go to that same backend.
         if self._native is not None:
             await self._native.set_output(output_id, state)
+            return
+        if self._smartliving is not None:
+            await self._smartliving.set_output(output_id, state)
             return
         if self._primelan is not None:
             await self._primelan.set_output(output_id, state, level)

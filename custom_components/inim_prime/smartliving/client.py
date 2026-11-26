@@ -18,6 +18,15 @@ from .const import (
     FIRMWARE_LENGTH,
     SERIAL_ADDRESS,
     SERIAL_LENGTH,
+    EVENT_BASE,
+    EVENT_LENGTH,
+    EVENT_POINTER_ADDRESS,
+    EVENT_POINTER_LENGTH,
+    FIXED_OUTPUTS,
+    NAME_POINTERS_ADDRESS,
+    NAME_POINTERS_LENGTH,
+    OUTPUT_ADDRESS,
+    OUTPUT_NAMES_POINTER,
     NAME_LENGTH,
     TERMINAL_RECORD_SIZE,
     ZONE_RECORD_SIZE,
@@ -30,7 +39,7 @@ from .const import (
     Model,
     model_from_firmware,
 )
-from .models import Configuration, Output, PanelInfo, Status, Zone
+from .models import Configuration, Event, Output, PanelInfo, Status, Zone
 from .parsing import (
     is_output_type,
     active_scenarios,
@@ -44,11 +53,17 @@ from .parsing import (
     parse_terminal_types,
     parse_zone_areas,
     parse_zone_status,
+    event_address,
+    output_state_layout,
+    parse_event,
+    parse_name_pointer,
+    parse_output_states,
 )
 from .commands import (
     ArmMode,
     arm_payload,
     exclude_payload,
+    output_payload,
     reset_memory_payload,
     scenario_payload,
 )
@@ -144,9 +159,24 @@ class Client:
                 continue
             name = zone_names.get(terminal, "")
             if is_output_type(types.get(terminal, 0)):
-                outputs[terminal] = Output(terminal, name, physical_index)
+                # Physical index 0-2 is also the command index of a fixed
+                # output: such a terminal output would be ambiguous.
+                if physical_index >= FIXED_OUTPUTS:
+                    outputs[terminal] = Output(terminal, name, physical_index, state_bit=terminal - 1)
             else:
                 zones[terminal] = Zone(terminal, name, physical_index, zone_areas.get(terminal, frozenset()))
+
+        pointers = await self._protocol.read(BANK_MAIN, NAME_POINTERS_ADDRESS, NAME_POINTERS_LENGTH)
+        output_names_offset = parse_name_pointer(pointers, OUTPUT_NAMES_POINTER - NAME_POINTERS_ADDRESS)
+        fixed_names: dict[int, str] = {}
+        if output_names_offset:
+            fixed_names = await self._names(CONFIG_BASE + output_names_offset, FIXED_OUTPUTS)
+        for j, default in enumerate(("Relè", "OC1", "OC2")):
+            output_id = model.zones + 1 + j
+            outputs[output_id] = Output(
+                output_id, fixed_names.get(j + 1) or default, j,
+                state_bit=model.zones + j, fixed=True,
+            )
 
         self._configuration = Configuration(
             info=info,
@@ -168,13 +198,41 @@ class Client:
         areas_raw = await self._protocol.read(BANK_MAIN, AREAS_STATUS_ADDRESS, area_status_length(model.areas))
         states = await self._protocol.read(BANK_MAIN, ZONES_STATUS_ADDRESS, ZONES_STATUS_LENGTH)
         enabled = await self._protocol.read(BANK_MAIN, ZONES_ENABLED_ADDRESS, ZONES_ENABLED_LENGTH)
-        memory = await self._protocol.read(BANK_MAIN, ZONES_ALARM_MEMORY_ADDRESS, ZONES_ALARM_MEMORY_LENGTH)
+        _, output_length = output_state_layout(model.zones, FIXED_OUTPUTS)
+        memory = await self._protocol.read(
+            BANK_MAIN, ZONES_ALARM_MEMORY_ADDRESS, max(ZONES_ALARM_MEMORY_LENGTH, output_length),
+        )
         areas = parse_area_status(areas_raw, model.areas)
         return Status(
             areas=areas,
             zones=parse_zone_status(states, enabled, memory, list(self._configuration.zones)),
             active_scenarios=active_scenarios(self._configuration.scenarios, areas),
+            outputs=parse_output_states(
+                memory, model.zones, FIXED_OUTPUTS,
+                {o.output_id: o.state_bit for o in self._configuration.outputs.values()},
+            ),
         )
+
+    async def read_events(self, count: int = 30) -> list[Event]:
+        """The newest `count` events, newest first. Empty on models whose log
+        layout is not known."""
+        if self._model is None:
+            await self.read_panel_info()
+        model = self._model
+        if model is None or not model.events:
+            return []
+        raw = await self._protocol.read(BANK_MAIN, EVENT_POINTER_ADDRESS, EVENT_POINTER_LENGTH)
+        pointer = raw[0] | (raw[1] << 8)
+        events = []
+        for back in range(count):
+            address = event_address(pointer, back, EVENT_BASE, EVENT_LENGTH)
+            if address is None:
+                break
+            data = await self._protocol.read(BANK_NAMES, CONFIG_BASE + address, EVENT_LENGTH)
+            if not any(data):
+                break
+            events.append(parse_event(data, address, model.areas))
+        return events
 
     async def _command(self, address: int, payload: bytes) -> None:
         result = await self._protocol.command(address, payload)
@@ -202,3 +260,12 @@ class Client:
     async def activate_scenario(self, pin: str, scenario: int) -> None:
         """Scenario 1-30."""
         await self._command(SCENARIO_ADDRESS, scenario_payload(pin, scenario))
+
+    async def set_output(self, pin: str, output_id: int, on: bool) -> None:
+        if self._configuration is None:
+            await self.read_configuration()
+        assert self._configuration is not None
+        output = self._configuration.outputs.get(output_id)
+        if output is None:
+            raise ValueError(f"output {output_id} is not programmed")
+        await self._command(OUTPUT_ADDRESS, output_payload(pin, output.physical_index, on))

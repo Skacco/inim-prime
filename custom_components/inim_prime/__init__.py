@@ -277,7 +277,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: InimPrimeConfigEntry) ->
     if inim_gateway.supports_log_events:
         panel_log_events_coordinator = InimPrimePanelLogEventsCoordinator(
             hass = hass,
-            update_interval = timedelta(milliseconds = scan_intervals["panel_log_events"]),
+            update_interval = timedelta(milliseconds = scan_intervals.get(
+                "panel_log_events", PANEL_LOG_EVENTS_SCAN_INTERVAL_PRIMELAN_DEFAULT,
+            )),
             entry = entry,
             gateway = inim_gateway,
         )

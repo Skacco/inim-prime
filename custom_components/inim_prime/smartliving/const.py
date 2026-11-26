@@ -45,6 +45,21 @@ ZONES_STATUS_LENGTH: Final[int] = 26
 ZONES_ENABLED_LENGTH: Final[int] = 26
 ZONES_ALARM_MEMORY_LENGTH: Final[int] = 28
 
+# Name table pointers (little endian, offsets in the names bank). Only the
+# output one is used: area/zone/scenario tables come from the model.
+NAME_POINTERS_ADDRESS: Final[int] = 0x004014
+NAME_POINTERS_LENGTH: Final[int] = 0x16
+OUTPUT_NAMES_POINTER: Final[int] = 0x4028
+# Fixed outputs on every model: relay, OC1, OC2 (command index 0, 1, 2).
+FIXED_OUTPUTS: Final[int] = 3
+
+# Event log (1050, from the integration that first read it): a 4-byte pointer
+# at 0x1FFE, then 9-byte compact events in the names bank, newest first.
+EVENT_POINTER_ADDRESS: Final[int] = 0x001FFE
+EVENT_POINTER_LENGTH: Final[int] = 4
+EVENT_LENGTH: Final[int] = 9
+EVENT_BASE: Final[int] = 0x9204
+
 COMMAND_RESULT_ADDRESS: Final[int] = 0x002004
 COMMAND_RESULT_LENGTH: Final[int] = 1
 COMMAND_RESULT_OK: Final[int] = 0x00
@@ -53,11 +68,13 @@ COMMAND_RESULT_BAD_PIN: Final[int] = 0x01
 # Commands: address -> payload length. Every payload starts with the 6-byte PIN.
 ARM_ADDRESS: Final[int] = 0x002006         # PIN + 8 bytes, one nibble per area
 RESET_MEMORY_ADDRESS: Final[int] = 0x002008  # PIN + 2 bytes area mask (LE)
+OUTPUT_ADDRESS: Final[int] = 0x002007      # PIN + output index + 1/0
 EXCLUDE_ADDRESS: Final[int] = 0x002009     # PIN + 2 bytes physical index (LE) + 1/0
 SCENARIO_ADDRESS: Final[int] = 0x00200A    # PIN + scenario number (0-based)
 PIN_LENGTH: Final[int] = 6
 COMMANDS: Final[dict[int, int]] = {
     ARM_ADDRESS: PIN_LENGTH + 8,
+    OUTPUT_ADDRESS: PIN_LENGTH + 2,
     RESET_MEMORY_ADDRESS: PIN_LENGTH + 2,
     EXCLUDE_ADDRESS: PIN_LENGTH + 3,
     SCENARIO_ADDRESS: PIN_LENGTH + 1,
@@ -97,6 +114,7 @@ class Model:
     scenario_records: int   # per scenario: one nibble per area (arm modes)
     scenario_record_size: int
     verified: bool          # read on a real panel of this model
+    events: bool = False    # event log layout known
 
 
 # 1050: read on a SmartLiving 1050 firmware 6.08.
@@ -108,7 +126,7 @@ MODELS: Final[dict[str, Model]] = {
     "1050": Model(
         name="SmartLiving 1050", areas=10, zones=50, scenarios=30, physical_terminals=130,
         area_names=0x010000, zone_names=0x0100A0, scenario_names=0x011450,
-        terminal_table=0x78FD, terminal_records=0x57D4, zone_records=0x5450,
+        terminal_table=0x78FD, terminal_records=0x57D4, zone_records=0x5450, events=True,
         scenario_records=0x73D8, scenario_record_size=8,
         verified=True,
     ),

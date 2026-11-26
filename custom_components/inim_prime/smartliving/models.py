@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime
 from enum import IntEnum
 
 
@@ -16,10 +17,12 @@ class AreaState(IntEnum):
 
 
 class ZoneState(IntEnum):
-    """Two-bit zone state in the live status (1 and 2 seen on real panels)."""
+    """Two-bit zone state in the live status. 1 and 2 seen on real panels;
+    3 is the tamper of a double-balanced line (cut or shorted)."""
 
     STANDBY = 1
     OPEN = 2
+    TAMPER = 3
     UNKNOWN = -1
 
 
@@ -41,9 +44,24 @@ class Zone:
 
 @dataclass(frozen=True)
 class Output:
-    output_id: int                  # logical terminal, 1-based
+    output_id: int                  # terminal outputs: logical terminal (1-based);
+                                    # fixed outputs: zones + 1 + j (relay, OC1, OC2)
     name: str
-    physical_index: int
+    physical_index: int             # command index
+    state_bit: int = 0              # bit in the output state block
+    fixed: bool = False
+
+
+@dataclass(frozen=True)
+class Event:
+    index: int                      # position in the panel log
+    timestamp: datetime             # panel time
+    code: int
+    areas: frozenset[int]
+    zone: int | None                # 1-based, for zone events
+    scenario: int | None            # 1-based, for scenario events
+    user: int | None                # code or key number, for arm/disarm events
+    raw: bytes
 
 
 @dataclass(frozen=True)
@@ -86,3 +104,4 @@ class Status:
     areas: dict[int, AreaStatus]
     zones: dict[int, ZoneStatus]
     active_scenarios: frozenset[int] = frozenset()
+    outputs: dict[int, bool] = field(default_factory=dict)

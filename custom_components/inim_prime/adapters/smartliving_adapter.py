@@ -8,6 +8,10 @@ import time
 from dataclasses import replace
 from types import MappingProxyType
 
+from homeassistant.util import dt as dt_util
+
+from ..models.log_events import UnifiedLogEvent
+from ..models.outputs import UnifiedOutput
 from ..models.partitions import UnifiedArmingStatus, UnifiedPartition, UnifiedPartitionState
 from ..models.scenarios import UnifiedScenario
 from ..models.zones import UnifiedZone, UnifiedZoneState
@@ -42,6 +46,27 @@ _UNIFIED_TO_ARM_MODE: dict[UnifiedArmingStatus, ArmMode] = {
 _ZONE_STATE_TO_UNIFIED: dict[ZoneState, UnifiedZoneState] = {
     ZoneState.STANDBY: UnifiedZoneState.STANDBY,
     ZoneState.OPEN: UnifiedZoneState.ALARM,
+    ZoneState.TAMPER: UnifiedZoneState.TAMPER,
+}
+
+_EVENT_TYPES: dict[int, str] = {
+    0x80: "Allarme zona",
+    0x00: "Fine allarme zona",
+    0x85: "Esclusione zona",
+    0x05: "Fine esclusione zona",
+    0x8A: "Inserimento",
+    0x0A: "Fine inserimento",
+    0x8C: "Disinserimento",
+    0x0C: "Fine disinserimento",
+    0x8D: "Reset",
+    0x9E: "Attivazione scenario",
+    0x95: "Codice valido",
+    0x96: "Chiave valida",
+    0xBA: "Codice installatore",
+    0xC2: "Inizio programmazione",
+    0x42: "Fine programmazione",
+    0x9B: "Chiamata non riuscita",
+    0x1B: "Fine chiamata non riuscita",
 }
 
 
@@ -56,6 +81,7 @@ class SmartLivingAdapter:
         self._zones: dict[int, UnifiedZone] = {}
         self._partitions: dict[int, UnifiedPartition] = {}
         self._scenarios: dict[int, UnifiedScenario] = {}
+        self._outputs: dict[int, UnifiedOutput] = {}
         self._refreshed_at: float | None = None
 
     # ------------------------------------------------------------------
@@ -75,6 +101,11 @@ class SmartLivingAdapter:
     @property
     def configuration(self) -> Configuration | None:
         return self._client.configuration
+
+    @property
+    def has_event_log(self) -> bool:
+        model = self._client.model
+        return model is not None and model.events
 
     @property
     def serial_number(self) -> str | None:
@@ -142,9 +173,18 @@ class SmartLivingAdapter:
             )
             for sid, scenario in config.scenarios.items()
         }
+        outputs = {
+            output_id: UnifiedOutput(
+                output_id = output_id,
+                label = output.name or f"Uscita {output_id}",
+                state = status.outputs.get(output_id),
+            )
+            for output_id, output in config.outputs.items()
+        }
         self._zones = zones
         self._partitions = partitions
         self._scenarios = scenarios
+        self._outputs = outputs
         self._refreshed_at = time.monotonic()
 
     @property
@@ -154,6 +194,51 @@ class SmartLivingAdapter:
     @property
     def partitions(self) -> MappingProxyType[int, UnifiedPartition]:
         return MappingProxyType(self._partitions)
+
+    @property
+    def outputs(self) -> MappingProxyType[int, UnifiedOutput]:
+        return MappingProxyType(self._outputs)
+
+    async def update_outputs(self) -> MappingProxyType[int, UnifiedOutput]:
+        await self._refresh()
+        return self.outputs
+
+    def apply_output_state(self, output_id: int, state: bool) -> bool:
+        output = self._outputs.get(output_id)
+        if output is None:
+            return False
+        self._outputs = {**self._outputs, output_id: replace(output, state = state)}
+        return True
+
+    async def get_log_events(self, limit: int) -> list[UnifiedLogEvent]:
+        try:
+            events = await self._client.read_events(limit)
+        except SmartLivingConnectionError as err:
+            raise ConnectionError(str(err)) from err
+        config = self._client.configuration
+        area_names = config.area_names if config is not None else {}
+        result = []
+        for event in events:
+            if event.zone is not None:
+                zone = self._zones.get(event.zone) or self._outputs.get(event.zone)
+                location = zone.label if zone is not None else f"Zona {event.zone}"
+            elif event.scenario is not None:
+                scenario = self._scenarios.get(event.scenario - 1)
+                location = scenario.label if scenario is not None else f"Scenario {event.scenario}"
+            elif event.areas:
+                location = ", ".join(area_names.get(a) or f"Area {a}" for a in sorted(event.areas))
+            else:
+                location = None
+            result.append(UnifiedLogEvent(
+                id = event.index,
+                # panel local time
+                timestamp = event.timestamp.replace(tzinfo = dt_util.get_default_time_zone()),
+                type = _EVENT_TYPES.get(event.code, f"Evento {event.code:#04x}"),
+                agent = f"Utente {event.user}" if event.user is not None else None,
+                location = location,
+                value = None,
+            ))
+        return result
 
     @property
     def scenarios(self) -> MappingProxyType[int, UnifiedScenario]:
@@ -257,3 +342,6 @@ class SmartLivingAdapter:
         if scenario_id not in self._scenarios:
             raise KeyError(f"Unknown scenario id: {scenario_id}")
         await self._command(self._client.activate_scenario(self._require_pin(), scenario_id + 1))
+
+    async def set_output(self, output_id: int, state: bool) -> None:
+        await self._command(self._client.set_output(self._require_pin(), output_id, state))

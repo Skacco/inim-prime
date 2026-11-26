@@ -42,6 +42,13 @@ class FakeSmartLiving:
             (0, 0x010000 + MODEL.terminal_records): data.TERMINAL_RECORDS,
             (0, 0x010000 + MODEL.zone_records): data.ZONE_RECORDS,
             (0, 0x010000 + MODEL.scenario_records): data.SCENARIO_RECORDS,
+            (0, 0x004014): bytes.fromhex("0000a000e006000a400be00b200d6013501430160017"),
+            (1, 0x011700): _names(["Sirena int", "Uscita 1", "Uscita 2"]),
+            (0, 0x001FFE): bytes.fromhex("0200 0000"),
+            (1, 0x019204): (
+                bytes.fromhex("10000000" "0100" "05" "02" "8a")
+                + bytes.fromhex("20000000" "0100" "07" "00" "80")
+            ),
         }
 
     def _lookup(self, bank, address, length):
@@ -206,4 +213,25 @@ async def test_scenarios_and_alarm_in_progress(hass: HomeAssistant):
         await coordinator.async_refresh()
         await hass.async_block_till_done()
     assert hass.states.get(panel_entity).state == "triggered"
+    await hass.config_entries.async_unload(entry.entry_id)
+
+
+async def test_outputs_and_event_log(hass: HomeAssistant):
+    panel = FakeSmartLiving()
+    entry = await _setup(hass, panel)
+    gateway = entry.runtime_data.gateway
+    assert sorted(gateway.outputs) == [5, 7, 51, 52, 53]
+    registry = er.async_get(hass)
+    switch = next(
+        e.entity_id for e in er.async_entries_for_config_entry(registry, entry.entry_id)
+        if e.domain == "switch" and e.unique_id.endswith("_output_7")
+    )
+    with _patched(panel):
+        await hass.services.async_call("switch", "turn_on", {"entity_id": switch}, blocking=True)
+        await hass.async_block_till_done()
+        events = await gateway.get_log_events(10)
+    assert (0x002007, bytes.fromhex("010203040506") + bytes([9, 1])) in panel.commands
+    assert [e.type for e in events] == ["Allarme zona", "Inserimento"]
+    assert events[0].location == "Zona prova 08"
+    assert events[1].location == "Casa" and events[1].agent == "Utente 5"
     await hass.config_entries.async_unload(entry.entry_id)

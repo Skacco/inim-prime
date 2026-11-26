@@ -63,3 +63,10 @@ def scenario_payload(pin: str, scenario: int) -> bytes:
     if not 1 <= scenario <= 30:
         raise ValueError("scenario out of range 1-30")
     return encode_pin(pin) + bytes([scenario - 1])
+
+
+def output_payload(pin: str, index: int, on: bool) -> bytes:
+    """PIN + output command index + 1 (on) or 0 (off)."""
+    if not 0 <= index <= 0xFF:
+        raise ValueError("output index out of range")
+    return encode_pin(pin) + bytes([index, 1 if on else 0])
