@@ -82,8 +82,16 @@ def filter_new_log_events(
     # -------------------------------
     # Case 4: No overlap at all
     # -------------------------------
-    # If none of the above conditions matched, return all current_log_events as new
-    return current_log_events
+    # Only the events after the newest one already seen are new: a log read
+    # in another form (e.g. after moving from PrimeLAN to Native) must not
+    # replay the old events.
+    newest_seen = max(_local(e.timestamp) for e in last_log_events)
+    return [e for e in current_log_events if _local(e.timestamp) > newest_seen]
+
+
+def _local(timestamp: datetime) -> datetime:
+    """Panel local time without the zone (PrimeLAN gives it without)."""
+    return timestamp.replace(tzinfo = None)
 
 
 def serialize_panel_log_event(event: PanelLogEvent) -> dict:

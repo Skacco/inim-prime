@@ -844,18 +844,14 @@ class NativeAdapter:
         return self._event_types
 
     async def _object_label(self, kind: str | None, index: int) -> str:
-        if kind == "user" and index == 0xFF:
-            from ..const import NATIVE_NO_USER_LABEL
-            return NATIVE_NO_USER_LABEL
         label = await self._label(kind, index) if kind else None
         return label or str(index + 1)
 
     async def get_log_events(self, limit: int) -> list[UnifiedLogEvent]:
         """The newest `limit` events, oldest first, worded like PrimeLAN's."""
-        from homeassistant.util import dt as dt_util
         from ..const import (
             NATIVE_EVENT_OBJECT_KINDS, NATIVE_LOG_INFO_LENGTH, NATIVE_LOG_INFO_OPERATION,
-            NATIVE_REMOTE_LABEL,
+            NATIVE_NO_USER_LABEL, NATIVE_REMOTE_LABEL,
         )
 
         async def _do() -> list[UnifiedLogEvent]:
@@ -895,9 +891,13 @@ class NativeAdapter:
                 if extras.is_restore(record):
                     text = f"Fine {text}"
                 user = extras.record_user(event_type, record)
-                if user is not None and location is None:
-                    location = await self._object_label("user", user)
                 source = extras.record_source(event_type, record)
+                if user is not None and location is None:
+                    if user != extras.NO_USER:
+                        location = await self._object_label("user", user)
+                    elif source == -1:
+                        # a remote command without a user code: Home Assistant
+                        location = NATIVE_NO_USER_LABEL
                 agent = None
                 if source == -1:
                     agent = NATIVE_REMOTE_LABEL
@@ -905,8 +905,8 @@ class NativeAdapter:
                     agent = await self._object_label("keypad", source)
                 events.append(UnifiedLogEvent(
                     id = record.index,
-                    # panel local time
-                    timestamp = record.timestamp.replace(tzinfo = dt_util.get_default_time_zone()),
+                    # panel local time, without the zone like PrimeLAN's
+                    timestamp = record.timestamp,
                     type = text,
                     agent = agent,
                     location = location,

@@ -163,6 +163,7 @@ USER_FLAG = 0x01
 KEYPAD_FLAG = 0x10
 DETAILS_FLAG = 0x80
 REMOTE_SOURCES = (0xFE, 0xFF)
+NO_USER = 0xFF  # no user code (keypad quick arming, Home Assistant)
 
 
 def record_user(event_type: EventType, record: LogRecord) -> int | None:

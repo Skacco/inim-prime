@@ -110,5 +110,27 @@ async def test_log_events_read_like_primelan():
         ("Fine MancanzaLineaTel", None, None),
         ("Codice valido", "TAST. GARAGE", "Mario"),
     ]
-    assert events[0].timestamp.strftime("%Y-%m-%d %H:%M:%S") == "2026-11-26 13:07:23"
+    assert events[0].timestamp.isoformat() == "2026-11-26T13:07:23"
     assert events[-1].id == NEXT_INDEX - 1
+
+
+def test_quick_arming_at_a_keypad_has_no_user():
+    from types import SimpleNamespace as NS
+    types = extras.parse_event_types(d.EVENT_TYPES, d.EVENT_TEXTS)
+    event_type, _ = extras.find_event_type(types, 0x1C50)       # Area ins. parz.
+    record = extras.parse_record(0, bytes.fromhex("cddd6a32080000c0501cff870200"))
+    assert extras.record_user(event_type, record) == extras.NO_USER
+    assert extras.record_source(event_type, record) == 2         # TAST. NOTTE, not remote
+
+
+def test_a_log_read_in_another_form_does_not_replay_old_events():
+    from datetime import datetime
+    from custom_components.inim_prime.helpers.panel_log_events import filter_new_log_events
+    from custom_components.inim_prime.models.log_events import UnifiedLogEvent as E
+
+    def ev(minute, location):
+        return E(1, datetime(2026, 11, 26, 15, minute), "t", None, location, None)
+
+    last = [ev(0, None), ev(7, None)]                  # as PrimeLAN wrote them
+    current = [ev(0, "Home Assistant"), ev(7, "Home Assistant"), ev(9, "Home Assistant")]
+    assert [e.timestamp.minute for e in filter_new_log_events(last, current)] == [9]
