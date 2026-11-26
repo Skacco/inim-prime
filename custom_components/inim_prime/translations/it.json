@@ -463,20 +463,6 @@
         }
       }
     },
-    "debug_raw_command": {
-      "name": "Debug: comando grezzo",
-      "description": "Protocollo Native: invia un comando grezzo. Può cambiare lo stato della centrale: usare con cautela.",
-      "fields": {
-        "operation": {
-          "name": "Operazione",
-          "description": "Codice operazione del comando."
-        },
-        "data": {
-          "name": "Dati",
-          "description": "Dati del comando come byte esadecimali."
-        }
-      }
-    },
     "debug_memory_diff": {
       "name": "Debug: confronto memoria",
       "description": "Protocollo Native: legge un blocco di memoria ed elenca i byte cambiati dalla chiamata precedente (snapshot=true lo memorizza soltanto).",
@@ -496,46 +482,6 @@
         "max_changes": {
           "name": "Max cambiamenti",
           "description": "Numero massimo di intervalli cambiati restituiti."
-        }
-      }
-    },
-    "debug_write_memory": {
-      "name": "Debug: scrivi memoria",
-      "description": "Protocollo Native: scrive byte grezzi nella memoria della centrale, come fa Prime/STUDIO. Modifica la centrale: usare con cautela.",
-      "fields": {
-        "address": {
-          "name": "Indirizzo",
-          "description": "Indirizzo iniziale."
-        },
-        "data": {
-          "name": "Dati",
-          "description": "Byte da scrivere, in esadecimale."
-        },
-        "session": {
-          "name": "Sessione di programmazione",
-          "description": "Racchiude la scrittura nei comandi begin/end che invia Prime/STUDIO."
-        }
-      }
-    },
-    "debug_probe_commands": {
-      "name": "Debug: sonda comandi",
-      "description": "Protocollo Native: invia comandi semplici (operazione + dati, senza PIN) e restituisce le risposte. Comandi sconosciuti possono cambiare la centrale: usare con cautela.",
-      "fields": {
-        "operations": {
-          "name": "Operazioni",
-          "description": "Elenco dei codici operazione."
-        },
-        "data": {
-          "name": "Dati",
-          "description": "Byte dati in esadecimale, inviati con ogni operazione."
-        },
-        "response_length": {
-          "name": "Lunghezza risposta",
-          "description": "Lunghezza attesa del payload di risposta (opzionale)."
-        },
-        "delay": {
-          "name": "Pausa",
-          "description": "Pausa tra i comandi."
         }
       }
     }

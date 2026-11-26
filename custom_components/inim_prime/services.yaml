@@ -37,15 +37,6 @@ debug_read_memory:
     length:
       selector:
         number: {min: 1, max: 4096, mode: box}
-debug_raw_command:
-  fields:
-    operation:
-      required: true
-      selector:
-        number: {min: 0, max: 255, mode: box}
-    data:
-      selector:
-        text:
 debug_memory_diff:
   fields:
     address:
@@ -62,31 +53,3 @@ debug_memory_diff:
     max_changes:
       selector:
         number: {min: 1, max: 2000, mode: box}
-debug_write_memory:
-  fields:
-    address:
-      required: true
-      selector:
-        number: {min: 0, max: 4294967295, mode: box}
-    data:
-      required: true
-      selector:
-        text:
-    session:
-      selector:
-        boolean:
-debug_probe_commands:
-  fields:
-    operations:
-      required: true
-      selector:
-        object:
-    data:
-      selector:
-        text:
-    response_length:
-      selector:
-        number: {min: 1, max: 1024, mode: box}
-    delay:
-      selector:
-        number: {min: 0, max: 5, step: 0.1, unit_of_measurement: s}

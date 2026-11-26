@@ -1,10 +1,11 @@
-"""Low-level native protocol services, for reverse-engineering only.
+"""Low-level read-only services, for troubleshooting.
 
-They expose the raw terminal status table, raw memory reads and raw
-commands of the native protocol, so features the library does not support
-yet (roller blinds, timers, thermostats) can be studied from Home Assistant
-without extra tools. Every call goes through the integration's own native
-connection and its lock, so it never races the coordinators.
+They expose the raw terminal status table and raw memory reads of the native
+protocol, and the PrimeLAN output list, so a panel the library does not read
+correctly can be studied from Home Assistant without extra tools. They only
+read: nothing here writes to the panel or sends it commands. They are admin
+only. Every call goes through the integration's own native connection and its
+lock, so it never races the coordinators.
 """
 from __future__ import annotations
 
@@ -16,8 +17,8 @@ import voluptuous as vol
 from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse, SupportsResponse
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers.service import async_register_admin_service
 
-from inim.prime.native.const import CommandOperation, FrameOperation
 from inim.prime.native.operations.terminals.get_terminal_statuses import get_terminal_statuses
 from inim.prime.native.operations.zones.const import get_zone_ids_interval
 from inim.prime.native.operations.zones.get_zone_labels import get_zone_labels
@@ -28,10 +29,7 @@ from .const import DOMAIN
 SERVICE_READ_TERMINALS = "debug_read_terminals"
 SERVICE_WATCH_TERMINALS = "debug_watch_terminals"
 SERVICE_READ_MEMORY = "debug_read_memory"
-SERVICE_RAW_COMMAND = "debug_raw_command"
 SERVICE_MEMORY_DIFF = "debug_memory_diff"
-SERVICE_WRITE_MEMORY = "debug_write_memory"
-SERVICE_PROBE_COMMANDS = "debug_probe_commands"
 SERVICE_PRIMELAN_OUTPUTS = "debug_primelan_outputs"
 _SNAPSHOTS: dict[tuple[int, int], bytes] = {}
 
@@ -55,49 +53,11 @@ READ_MEMORY_SCHEMA = vol.Schema({
     vol.Optional("length", default = 16): vol.All(vol.Coerce(int), vol.Range(min = 1, max = 4096)),
 })
 
-RAW_COMMAND_SCHEMA = vol.Schema({
-    vol.Required("operation"): vol.All(vol.Coerce(int), vol.Range(min = 0, max = 255)),
-    vol.Optional("data", default = ""): cv.string,
-})
-
-
 MEMORY_DIFF_SCHEMA = vol.Schema({
     vol.Required("address"): vol.Coerce(int),
     vol.Required("length"): vol.All(vol.Coerce(int), vol.Range(min = 1, max = 262144)),
     vol.Optional("snapshot", default = False): cv.boolean,
     vol.Optional("max_changes", default = 200): vol.All(vol.Coerce(int), vol.Range(min = 1, max = 2000)),
-})
-
-
-WRITE_MEMORY_SCHEMA = vol.Schema({
-    vol.Required("address"): vol.Coerce(int),
-    vol.Required("data"): cv.string,
-    vol.Optional("session", default = True): cv.boolean,
-})
-
-# Seen in Prime/STUDIO "write only changes": a command 0x13 (data 00 = begin,
-# 01 = end) around memory writes. A write is a read request with the 2-byte
-# flag after the lengths set to 01 00, followed by the raw data; the panel
-# answers with one byte, the 8-bit sum of the data.
-_SESSION_BEGIN = bytes.fromhex("13 00 00 00 00")
-_SESSION_END = bytes.fromhex("13 00 00 00 01")
-
-
-def _write_request(address: int, data: bytes) -> bytes:
-    header = (
-        address.to_bytes(8, "little")
-        + len(data).to_bytes(4, "little")
-        + len(data).to_bytes(4, "little")
-        + b"\x01\x00\x11"
-    )
-    return header + bytes([sum(header) & 0xFF]) + data
-
-
-PROBE_COMMANDS_SCHEMA = vol.Schema({
-    vol.Required("operations"): vol.All(cv.ensure_list, [vol.All(vol.Coerce(int), vol.Range(min = 0, max = 0xFFFF))]),
-    vol.Optional("data", default = ""): cv.string,
-    vol.Optional("response_length"): vol.All(vol.Coerce(int), vol.Range(min = 1, max = 1024)),
-    vol.Optional("delay", default = 0.3): vol.All(vol.Coerce(float), vol.Range(min = 0, max = 5)),
 })
 
 
@@ -207,71 +167,6 @@ async def _memory_diff(hass: HomeAssistant, call: ServiceCall) -> ServiceRespons
     return {"changes": changes}
 
 
-async def _write_memory(hass: HomeAssistant, call: ServiceCall) -> ServiceResponse:
-    client = _native_client(hass)
-    try:
-        data = bytes.fromhex(call.data["data"].replace(" ", ""))
-    except ValueError as err:
-        raise ServiceValidationError("data must be hex bytes, e.g. 'f7'") from err
-    if not data or len(data) > 1024:
-        raise ServiceValidationError("data must be 1-1024 bytes")
-    protocol = client._protocol
-    result = {}
-    async with client._lock:
-        if call.data["session"]:
-            result["begin"] = (await protocol.exchange_payload(_SESSION_BEGIN, FrameOperation.COMMAND, 5)).hex(" ")
-        try:
-            ack = await protocol.exchange_payload(
-                _write_request(call.data["address"], data), FrameOperation.READ, 1,
-            )
-            result["ack"] = ack.hex(" ")
-            result["expected_ack"] = f"{sum(data) & 0xFF:02x}"
-        finally:
-            if call.data["session"]:
-                result["end"] = (await protocol.exchange_payload(_SESSION_END, FrameOperation.COMMAND, 5)).hex(" ")
-    return result
-
-
-async def _probe_commands(hass: HomeAssistant, call: ServiceCall) -> ServiceResponse:
-    """Send plain commands (4-byte operation + data, no PIN) like Prime/STUDIO's
-    monitoring does (e.g. 0x0d + 00 = system status) and return the answers.
-    Stops at the first connection error."""
-    client = _native_client(hass)
-    try:
-        data = bytes.fromhex(call.data["data"].replace(" ", ""))
-    except ValueError as err:
-        raise ServiceValidationError("data must be hex bytes") from err
-    results = {}
-    for operation in call.data["operations"]:
-        payload = operation.to_bytes(4, "little") + data
-        try:
-            async with client._lock:
-                response = await client._protocol.exchange_payload(
-                    payload, FrameOperation.COMMAND, call.data.get("response_length"),
-                )
-            results[f"{operation:#04x}"] = response.hex(" ")
-        except Exception as err:  # noqa: BLE001 - report and stop
-            results[f"{operation:#04x}"] = f"error: {err}"
-            break
-        await asyncio.sleep(call.data["delay"])
-    return {"results": results}
-
-
-async def _raw_command(hass: HomeAssistant, call: ServiceCall) -> ServiceResponse:
-    client = _native_client(hass)
-    try:
-        operation = CommandOperation(call.data["operation"])
-    except ValueError as err:
-        raise ServiceValidationError(f"Unknown operation {call.data['operation']}") from err
-    try:
-        data = bytes.fromhex(call.data["data"].replace(" ", ""))
-    except ValueError as err:
-        raise ServiceValidationError("data must be hex bytes, e.g. '4b 02 02 00'") from err
-    async with client._lock:
-        response = await client._protocol.execute_command_with_pin(operation, data or None, client._pin)
-    return {"response": response.hex(" ") if response else ""}
-
-
 def _primelan_client(hass: HomeAssistant):
     for entry in hass.config_entries.async_loaded_entries(DOMAIN):
         gateway = getattr(entry.runtime_data, "gateway", None)
@@ -304,13 +199,10 @@ def async_register(hass: HomeAssistant) -> None:
         (SERVICE_READ_TERMINALS, _read_terminals, READ_TERMINALS_SCHEMA),
         (SERVICE_WATCH_TERMINALS, _watch_terminals, WATCH_TERMINALS_SCHEMA),
         (SERVICE_READ_MEMORY, _read_memory, READ_MEMORY_SCHEMA),
-        (SERVICE_RAW_COMMAND, _raw_command, RAW_COMMAND_SCHEMA),
         (SERVICE_MEMORY_DIFF, _memory_diff, MEMORY_DIFF_SCHEMA),
-        (SERVICE_WRITE_MEMORY, _write_memory, WRITE_MEMORY_SCHEMA),
-        (SERVICE_PROBE_COMMANDS, _probe_commands, PROBE_COMMANDS_SCHEMA),
         (SERVICE_PRIMELAN_OUTPUTS, _primelan_outputs, vol.Schema({})),
     ):
         async def _handler(call: ServiceCall, _h = handler) -> ServiceResponse:
             return await _h(hass, call)
-        hass.services.async_register(DOMAIN, name, _handler, schema = schema,
+        async_register_admin_service(hass, DOMAIN, name, _handler, schema = schema,
                                      supports_response = SupportsResponse.ONLY)

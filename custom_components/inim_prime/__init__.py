@@ -429,7 +429,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: InimPrimeConfigEntry) ->
     )
 
     _link_child_devices(hass, entry)
-    _drop_old_default_names(hass, entry)
     debug_services.async_register(hass)
     connection_drops.async_register(hass)
     # the port check now runs only in the connection form
@@ -444,7 +443,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: InimPrimeConfigEntry) ->
     _remove_old_connectivity_entities(hass, entry)
     _remove_stale_number_entities(hass, entry)
     _remove_old_grouped_devices(hass, entry)
-    _rename_shutter_entities(hass, entry)
     _remove_unmapped_shutter_covers(hass, entry, inim_gateway)
     # After the stale-entity cleanups above, drop any optional grouping device
     # (Timer, Uscite, Tapparelle, Termostati) now left without entities.
@@ -558,28 +556,6 @@ def _remove_unmapped_shutter_covers(hass: HomeAssistant, entry: InimPrimeConfigE
         module = entity.unique_id[len(prefix):]
         if module.isdigit() and int(module) not in mapped:
             entity_registry.async_remove(entity.entity_id)
-
-
-def _rename_shutter_entities(hass: HomeAssistant, entry: InimPrimeConfigEntry) -> None:
-    """Rename shutter cover entity_ids to match the shutter name.
-
-    They used to be derived from the per-shutter device name (e.g.
-    cover.tapparella_03_tapparella_03); give them a clean id from the shutter's
-    own name instead (cover.tenda_sala). entity_id changes, but existing ones
-    were not meaningful anyway."""
-    from homeassistant.util import slugify
-
-    prefix = f"{entry.data['serial_number']}_shutter_"
-    entity_registry = er.async_get(hass)
-    for entity in er.async_entries_for_config_entry(entity_registry, entry.entry_id):
-        if entity.domain != "cover" or not entity.unique_id.startswith(prefix):
-            continue
-        name = entity.original_name or entity.name
-        if not name:
-            continue
-        desired = f"cover.{slugify(name)}"
-        if entity.entity_id != desired and entity_registry.async_get(desired) is None:
-            entity_registry.async_update_entity(entity.entity_id, new_entity_id = desired)
 
 
 def _remove_empty_group_devices(hass: HomeAssistant, entry: InimPrimeConfigEntry) -> None:
@@ -751,28 +727,6 @@ def _remove_stale_output_entities(hass: HomeAssistant, entry: InimPrimeConfigEnt
         suffix = entity.unique_id[len(prefix):]
         if suffix.isdigit() and (int(suffix) not in outputs or int(suffix) in shutter_terminals):
             entity_registry.async_remove(entity.entity_id)
-
-
-# Names earlier versions gave by default. Home Assistant keeps them as custom
-# names (even across a delete + reinstall, from its deleted-entries store), so
-# they would hide the current ones.
-_OLD_DEVICE_NAMES = ("Partizioni", "Partizione")
-_OLD_ENTITY_NAME_SUFFIXES = (" Arming Status", " Reset Memory", " Alarm Memory", " State")
-
-
-def _drop_old_default_names(hass: HomeAssistant, entry: InimPrimeConfigEntry) -> None:
-    """Remove custom names that are just an old default of this integration.
-
-    Any other custom name is the user's choice and is left alone.
-    """
-    device_registry = dr.async_get(hass)
-    for device in dr.async_entries_for_config_entry(device_registry, entry.entry_id):
-        if device.name_by_user in _OLD_DEVICE_NAMES:
-            device_registry.async_update_device(device.id, name_by_user = None)
-    entity_registry = er.async_get(hass)
-    for entity in er.async_entries_for_config_entry(entity_registry, entry.entry_id):
-        if entity.name and entity.name.endswith(_OLD_ENTITY_NAME_SUFFIXES):
-            entity_registry.async_update_entity(entity.entity_id, name = None)
 
 
 def _link_child_devices(hass: HomeAssistant, entry: InimPrimeConfigEntry) -> None:

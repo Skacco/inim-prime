@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import asdict, is_dataclass
 from typing import Any
 
 from homeassistant.components.diagnostics import async_redact_data
@@ -12,8 +13,18 @@ from .const import (
 from .runtime_data import InimPrimeConfigEntry
 from .gateway import InimPrimeGateway
 
-# Options left out of the download: PINs and passwords.
-_REDACTED_OPTIONS = {"alarm_pin", "pin", "password"}
+# Left out of the download: PINs, passwords and the webhook secret in the
+# options, the panel serial number, and who armed or disarmed in the log events.
+_REDACTED_OPTIONS = {"alarm_pin", "pin", "password", "webhook_id"}
+_REDACTED_PANEL = {"serial_number"}
+_REDACTED_LOG_EVENTS = {"agent"}
+
+
+def _log_events(events) -> list[dict[str, Any]]:
+    return async_redact_data(
+        [asdict(event) if is_dataclass(event) else dict(event) for event in events],
+        _REDACTED_LOG_EVENTS,
+    )
 
 
 async def async_get_config_entry_diagnostics(
@@ -78,7 +89,7 @@ async def async_get_config_entry_diagnostics(
             "credit": gsm.credit,
         }
 
-    return diagnostics
+    return async_redact_data(diagnostics, _REDACTED_PANEL)
 
 
 async def async_get_device_diagnostics(
@@ -149,6 +160,6 @@ async def async_get_device_diagnostics(
                         fault.name for fault in system_faults.faults
                     ]
                 if panel_log_events_coordinator is not None:
-                    device_info["log_events"] = panel_log_events_coordinator.last_panel_log_events
+                    device_info["log_events"] = _log_events(panel_log_events_coordinator.last_panel_log_events)
 
-    return device_info
+    return async_redact_data(device_info, _REDACTED_PANEL)

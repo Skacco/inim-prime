@@ -463,20 +463,6 @@
         }
       }
     },
-    "debug_raw_command": {
-      "name": "Debug: raw command",
-      "description": "Native protocol: send a raw command. Can change the panel state: use with care.",
-      "fields": {
-        "operation": {
-          "name": "Operation",
-          "description": "Command operation code."
-        },
-        "data": {
-          "name": "Data",
-          "description": "Command data as hex bytes."
-        }
-      }
-    },
     "debug_memory_diff": {
       "name": "Debug: memory diff",
       "description": "Native protocol: read a memory block and list the bytes changed since the previous call (snapshot=true only stores it).",
@@ -496,46 +482,6 @@
         "max_changes": {
           "name": "Max changes",
           "description": "Maximum changed ranges returned."
-        }
-      }
-    },
-    "debug_write_memory": {
-      "name": "Debug: write memory",
-      "description": "Native protocol: write raw bytes to panel memory, like Prime/STUDIO does. Changes the panel: use with care.",
-      "fields": {
-        "address": {
-          "name": "Address",
-          "description": "Start address."
-        },
-        "data": {
-          "name": "Data",
-          "description": "Bytes to write, as hex."
-        },
-        "session": {
-          "name": "Programming session",
-          "description": "Wrap the write in the begin/end commands Prime/STUDIO sends."
-        }
-      }
-    },
-    "debug_probe_commands": {
-      "name": "Debug: probe commands",
-      "description": "Native protocol: send plain commands (operation + data, no PIN) and return the answers. Unknown commands may change the panel: use with care.",
-      "fields": {
-        "operations": {
-          "name": "Operations",
-          "description": "List of operation codes."
-        },
-        "data": {
-          "name": "Data",
-          "description": "Data bytes as hex, sent with every operation."
-        },
-        "response_length": {
-          "name": "Response length",
-          "description": "Expected response payload length (optional)."
-        },
-        "delay": {
-          "name": "Delay",
-          "description": "Pause between commands."
         }
       }
     }
