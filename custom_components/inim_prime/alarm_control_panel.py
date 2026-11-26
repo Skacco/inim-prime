@@ -54,7 +54,8 @@ def _native_output_map(options) -> dict[str, list[int]]:
 async def async_setup_entry(hass, entry: InimPrimeConfigEntry, async_add_entities):
     coordinators = entry.runtime_data.coordinators
     options = entry.options
-    has_native = bool(entry.data.get("native"))
+    # SmartLiving arms by areas like Native.
+    has_native = bool(entry.data.get("native") or entry.data.get("smartliving"))
     has_primelan = bool(entry.data.get("primelan"))
 
     # Optional extra panel protected by a PIN (code required to disarm only),

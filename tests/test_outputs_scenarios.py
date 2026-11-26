@@ -514,6 +514,7 @@ async def test_alarm_form_mixed_scenario_and_partitions():
 
     class Flow(InimPrimeOptionsFlowHandler):
         _has_native = True
+        _has_native_prime = True
         _has_primelan = True
 
         def __init__(self):

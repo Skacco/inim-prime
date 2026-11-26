@@ -55,6 +55,12 @@ async def async_setup_entry(hass, entry: InimPrimeConfigEntry, async_add_entitie
             entities.append(BackendConnectivityBinarySensor(
                 native_coordinator, serial_number, "Connessione Native", "connectivity_native",
             ))
+    if entry.data.get("smartliving"):
+        smartliving_coordinator = _first(coordinators.zones, coordinators.partitions)
+        if smartliving_coordinator is not None:
+            entities.append(BackendConnectivityBinarySensor(
+                smartliving_coordinator, serial_number, "Connessione SmartLiving", "connectivity_smartliving",
+            ))
     if entry.data.get("primelan"):
         # Scenarios block setup (fresh at startup); faults/GSM are deferred, so
         # prefer scenarios as the PrimeLAN health signal.

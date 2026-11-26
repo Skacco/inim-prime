@@ -4,11 +4,12 @@
     "step": {
       "user": {
         "title": "Configura INIM Prime",
-        "description": "Scegli quali modalità di integrazione usare per questa centrale.\n\n• Native — zone, aree, inserimento/disinserimento, uscite, timer e tapparelle. Polling locale veloce.\n• PrimeLAN — aggiunge scenari, stato GSM, guasti di sistema e il registro eventi.\n• Entrambi — tutto quanto sopra (Native dove può, PrimeLAN per il resto).\n\nSolo Native copre comunque l'essenziale; PrimeLAN richiede la scheda PrimeLAN e la sua chiave API.",
+        "description": "Scegli quali modalità di integrazione usare per questa centrale.\n\n• Native — zone, aree, inserimento/disinserimento, uscite, timer e tapparelle. Polling locale veloce.\n• PrimeLAN — aggiunge scenari, stato GSM, guasti di sistema e il registro eventi.\n• Entrambi — tutto quanto sopra (Native dove può, PrimeLAN per il resto).\n\nSolo Native copre comunque l'essenziale; PrimeLAN richiede la scheda PrimeLAN e la sua chiave API.\n• SmartLiving (beta) — centrali Inim SmartLiving con scheda SmartLAN/SI o SmartLAN/G, in locale.",
         "menu_options": {
           "native_only": "Solo Native",
           "primelan_only": "Solo PrimeLAN",
-          "both": "Native + PrimeLAN"
+          "both": "Native + PrimeLAN",
+          "smartliving": "SmartLiving (beta)"
         }
       },
       "serial_number": {
@@ -225,6 +226,26 @@
             "description": "Per ogni tapparella (numerata dal suo modulo Mod.dom) dai un nome opzionale (usato anche come nome della cover, es. \"Sala\") e scegli l'uscita comando che la apre e quella che la chiude (es. \"Apri tenda sala\" / \"Chiudi ... sala\"). Il modulo Smart esegue l'intera corsa da un singolo impulso e non ha stop. Puoi anche impostare i comandi 25/50/75% (uscite di apertura parziale) per abilitare lo slider di posizione, che si allinea al valore più vicino. Lascia vuoto per non mappare una tapparella."
           }
         }
+      },
+      "smartliving": {
+        "title": "Centrale SmartLiving (beta)",
+        "description": "Indirizzo della scheda SmartLAN della centrale.\n\nLa password TCP serve solo se è attiva sulla scheda (SmartLeague). Il PIN utente serve per inserire, disinserire ed escludere le zone: senza, l'integrazione legge soltanto.\n\nMentre l'integrazione è collegata, SmartLeague e le app che si collegano in locale non possono collegarsi: la scheda accetta un solo collegamento.{error}",
+        "data": {
+          "host": "Indirizzo IP",
+          "port": "Porta",
+          "password": "Password TCP (se attiva)",
+          "pin": "PIN utente"
+        }
+      },
+      "reconfigure_smartliving": {
+        "title": "Riconfigura la centrale SmartLiving",
+        "description": "Indirizzo della scheda SmartLAN della centrale.\n\nLa password TCP serve solo se è attiva sulla scheda (SmartLeague). Il PIN utente serve per inserire, disinserire ed escludere le zone: senza, l'integrazione legge soltanto.\n\nMentre l'integrazione è collegata, SmartLeague e le app che si collegano in locale non possono collegarsi: la scheda accetta un solo collegamento.{error}",
+        "data": {
+          "host": "Indirizzo IP",
+          "port": "Porta",
+          "password": "Password TCP (se attiva)",
+          "pin": "PIN utente"
+        }
       }
     },
     "error": {
@@ -233,12 +254,16 @@
       "native_password_rejected": "La centrale non ha accettato la password della connessione Native.{status}",
       "native_port_exposed": "La porta Native {port} della centrale è raggiungibile da Internet: rimuovi l'inoltro di quella porta sul router e riprova. Per proseguire comunque spegni il controllo della porta.",
       "native_port_check_failed": "Controllo porta Native non riuscito: il servizio di verifica non ha risposto, quindi non si sa se la porta {port} è raggiungibile da Internet. Riprova, cambia il servizio di verifica oppure spegni il controllo della porta.",
-      "native_password_too_long": "La password della connessione Native può avere al massimo {max} caratteri."
+      "native_password_too_long": "La password della connessione Native può avere al massimo {max} caratteri.",
+      "smartliving_cannot_connect": "Collegamento non riuscito. Controlla indirizzo e porta, che SmartLeague o un'app non siano collegati, e la password TCP se è attiva sulla scheda.",
+      "smartliving_unsupported": "Modello di centrale non supportato.",
+      "invalid_pin": "Il PIN deve avere da 4 a 6 cifre."
     },
     "abort": {
       "already_configured": "Questa centrale INIM Prime è già configurata.",
       "reconfigure_successful": "La centrale INIM Prime è stata riconfigurata con successo.",
-      "reconfigure_successful_port_closed": "La centrale INIM Prime è stata riconfigurata con successo. Controllo porta Native superato: la porta {port} non è raggiungibile da Internet."
+      "reconfigure_successful_port_closed": "La centrale INIM Prime è stata riconfigurata con successo. Controllo porta Native superato: la porta {port} non è raggiungibile da Internet.",
+      "smartliving_other_panel": "A quell'indirizzo risponde un'altra centrale."
     }
   },
   "options": {

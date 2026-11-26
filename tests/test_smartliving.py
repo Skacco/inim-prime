@@ -1,0 +1,175 @@
+"""SmartLiving panels: setup, entities and commands over a simulated SmartLAN
+board built from a real SmartLiving 1050 (configuration only, names replaced)."""
+from unittest.mock import patch
+
+from homeassistant.core import HomeAssistant
+from homeassistant.data_entry_flow import FlowResultType
+from homeassistant.helpers import entity_registry as er
+from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+from custom_components.inim_prime.const import DOMAIN
+from custom_components.inim_prime.smartliving.const import COMMANDS, MODELS
+from custom_components.inim_prime.smartliving.protocol import Protocol, checksum
+
+from . import smartliving_1050 as data
+
+SERIAL = "1234567890123456"
+MODEL = MODELS["1050"]
+
+
+def _names(names):
+    return b"".join(n.encode("ascii").ljust(16, b" ") for n in names)
+
+
+class FakeSmartLiving:
+    """Answers the SmartLAN requests the library sends; records the commands."""
+
+    def __init__(self, pin: str = "123456"):
+        self.pin = bytes(int(d) for d in pin).ljust(6, b"\xff")
+        self.commands: list[tuple[int, bytes]] = []
+        self.result = 0
+        self.areas = bytearray(data.AREAS_STATUS)
+        self.memory = {
+            (0, 0x004000): data.FIRMWARE,
+            (0, 0x00FEA0): SERIAL.encode(),
+            (0, 0x002001): data.ZONES_STATUS,
+            (0, 0x002002): data.ZONES_ENABLED,
+            (0, 0x002003): data.ZONES_ALARM_MEMORY,
+            (1, MODEL.area_names): _names(data.AREA_NAMES),
+            (1, MODEL.zone_names): _names(data.ZONE_NAMES),
+            (1, MODEL.scenario_names): _names(data.SCENARIO_NAMES),
+            (0, 0x010000 + MODEL.terminal_table): data.TERMINAL_TABLE,
+            (0, 0x010000 + MODEL.terminal_records): data.TERMINAL_RECORDS,
+            (0, 0x010000 + MODEL.zone_records): data.ZONE_RECORDS,
+        }
+
+    def _lookup(self, bank, address, length):
+        if (bank, address) == (0, 0x002000):
+            return bytes(self.areas[:length])
+        if (bank, address) == (0, 0x002004):
+            return bytes([self.result])[:length].ljust(length, b"\x00")
+        for (b, start), block in self.memory.items():
+            if b == bank and start <= address and address + length <= start + len(block):
+                return block[address - start:address - start + length]
+        return bytes(length)
+
+    async def exchange(self, protocol, request: bytes, answer_length: int) -> bytes:
+        assert request[0] in (0x00, 0x01)
+        assert checksum(request[:7]) == request[7]
+        address = int.from_bytes(request[2:5], "big")
+        if request[0] == 0x01:
+            payload = request[8:]
+            assert COMMANDS[address] == request[6] == len(payload)
+            self.commands.append((address, payload))
+            self.result = 0 if payload[:6] == self.pin else 1
+            if address == 0x002006 and self.result == 0:
+                for i, byte in enumerate(payload[6:]):
+                    for shift in (0, 4):
+                        mode = byte >> shift & 0x0F
+                        if mode:
+                            self.areas[i] = (self.areas[i] & ~(0x0F << shift)) | (mode << shift)
+            return bytes([checksum(payload)])
+        answer = self._lookup(request[1], address, request[6])
+        return answer + bytes([checksum(answer)])
+
+
+def _patched(panel):
+    async def _exchange(self, request, answer_length):
+        return await panel.exchange(self, request, answer_length)
+    return patch.object(Protocol, "_exchange", _exchange)
+
+
+async def _setup(hass: HomeAssistant, panel: FakeSmartLiving, options: dict | None = None):
+    entry = MockConfigEntry(
+        domain=DOMAIN, version=2, minor_version=0, unique_id=SERIAL,
+        data={"serial_number": SERIAL, "host": "192.0.2.20",
+              "smartliving": {"port": 5004, "password": "", "pin": "123456"}},
+        options={"scan_intervals": {"zones": 60000, "partitions": 60000},
+                 "hide_unused_partitions": True, **(options or {})},
+    )
+    entry.add_to_hass(hass)
+    with _patched(panel):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+    return entry
+
+
+async def test_config_flow_creates_a_smartliving_entry(hass: HomeAssistant):
+    panel = FakeSmartLiving()
+    with _patched(panel), patch("custom_components.inim_prime.async_setup_entry", return_value=True):
+        result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
+        assert result["type"] is FlowResultType.MENU
+        assert "smartliving" in result["menu_options"]
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], {"next_step_id": "smartliving"})
+        assert result["step_id"] == "smartliving"
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {"host": "192.0.2.20", "port": 5004, "pin": "123456"},
+        )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["result"].unique_id == SERIAL
+    assert result["data"]["smartliving"] == {"port": 5004, "password": "", "pin": "123456"}
+    assert not panel.commands
+
+
+async def test_zones_areas_and_panel(hass: HomeAssistant):
+    panel = FakeSmartLiving()
+    entry = await _setup(hass, panel, {"alarm_panel_native": {"arm_away": {"total": [1, 2, 3, 4]}}})
+    registry = er.async_get(hass)
+    entities = er.async_entries_for_config_entry(registry, entry.entry_id)
+    zone_entities = [e for e in entities if "_zone_" in e.unique_id and e.domain == "binary_sensor"]
+    # 22 terminals programmed, 2 of them outputs
+    assert len({e.unique_id.split("_zone_")[1].split("_")[0] for e in zone_entities}) == 20
+    panels = [e for e in entities if e.domain == "alarm_control_panel"]
+    assert panels
+    state = hass.states.get(panels[0].entity_id)
+    assert state.state == "disarmed"
+    assert not panel.commands
+
+    with _patched(panel):
+        await hass.services.async_call(
+            "alarm_control_panel", "alarm_arm_away", {"entity_id": panels[0].entity_id}, blocking=True,
+        )
+        await hass.async_block_till_done()
+    address, payload = panel.commands[0]
+    assert address == 0x002006
+    assert payload == bytes.fromhex("010203040506") + bytes.fromhex("1111000000000000")
+    await hass.config_entries.async_unload(entry.entry_id)
+
+
+async def test_zone_exclusion_and_disarm(hass: HomeAssistant):
+    panel = FakeSmartLiving()
+    entry = await _setup(hass, panel)
+    registry = er.async_get(hass)
+    switch = next(
+        e.entity_id for e in er.async_entries_for_config_entry(registry, entry.entry_id)
+        if e.domain == "switch" and "_zone_8" in e.unique_id
+    )
+    panel_entity = next(
+        e.entity_id for e in er.async_entries_for_config_entry(registry, entry.entry_id)
+        if e.domain == "alarm_control_panel"
+    )
+    with _patched(panel):
+        await hass.services.async_call("switch", "turn_on", {"entity_id": switch}, blocking=True)
+        await hass.services.async_call(
+            "alarm_control_panel", "alarm_disarm", {"entity_id": panel_entity}, blocking=True,
+        )
+        await hass.async_block_till_done()
+    pin = bytes.fromhex("010203040506")
+    # zone 8 sits at physical index 11 on this panel
+    assert (0x002009, pin + bytes.fromhex("0b0001")) in panel.commands
+    disarm = [p for a, p in panel.commands if a == 0x002006]
+    # the four areas in use (the others keep the panel default name)
+    assert disarm and disarm[0] == pin + bytes.fromhex("4444000000000000")
+    await hass.config_entries.async_unload(entry.entry_id)
+
+
+async def test_diagnostics_hide_the_smartliving_serial(hass: HomeAssistant):
+    from custom_components.inim_prime import diagnostics
+
+    panel = FakeSmartLiving()
+    entry = await _setup(hass, panel)
+    result = await diagnostics.async_get_config_entry_diagnostics(hass, entry)
+    assert result["panel"]["model"] == "1050"
+    assert result["panel"]["firmware"] == "6.08"
+    assert SERIAL not in str(result)
+    await hass.config_entries.async_unload(entry.entry_id)

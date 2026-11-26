@@ -22,6 +22,8 @@ from .const import NATIVE_REOPEN_DELAY, NATIVE_REOPEN_GRACE
 # entry_id -> time.monotonic() of the last unload that closed a Native connection
 _NATIVE_CLOSED_AT = "inim_prime_native_closed_at"
 from .adapters.primelan_adapter import PrimelanAdapter
+from .adapters.smartliving_adapter import SmartLivingAdapter
+from .smartliving import Client as SmartLivingClient
 from .const import (
     DOMAIN,
     STORAGE_KEY_OUTPUT_LABELS,
@@ -93,6 +95,17 @@ def _build_gateway(data: InimPrimeConfigData) -> InimPrimeGateway:
     host = data["host"]
     native_conf = data.get("native")
     primelan_conf = data.get("primelan")
+    smartliving_conf = data.get("smartliving")
+
+    if smartliving_conf:
+        client = SmartLivingClient(
+            host = host,
+            port = smartliving_conf["port"],
+            password = smartliving_conf.get("password") or None,
+        )
+        return InimPrimeGateway(
+            smartliving = SmartLivingAdapter(client, smartliving_conf.get("pin")),
+        )
 
     if native_conf:
         # Right after the setup form the client it opened is still connected
@@ -139,7 +152,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: InimPrimeConfigEntry) ->
         config_entry_id = entry.entry_id,
         identifiers = {(DOMAIN, data["serial_number"])},
         name = "Centrale Inim",
-        model = "Centrale Inim Prime",
+        model = "Centrale Inim SmartLiving" if data.get("smartliving") else "Centrale Inim Prime",
         manufacturer = INIM_PRIME_DEVICE_MANUFACTURER,
         serial_number = data["serial_number"],
     )
@@ -303,7 +316,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: InimPrimeConfigEntry) ->
     # cuts startup time roughly to the slower of the two instead of their sum.
     # Each chain stays sequential internally: the Native protocol handles one
     # command at a time, so its coordinators must not overlap each other.
-    prefer_native = bool(data.get("native"))
+    # SmartLiving reads like Native: one TCP link, one request at a time.
+    prefer_native = bool(data.get("native") or data.get("smartliving"))
     # Outputs must be refreshed before platform setup, in every mode. The output
     # list is populated by the outputs refresh (update_outputs), NOT by connect()
     # -- the Native adapter's connect() only opens the link, leaving the output

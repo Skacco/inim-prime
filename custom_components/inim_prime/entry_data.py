@@ -25,12 +25,19 @@ class PrimelanConfigData(TypedDict):
     use_https: bool
 
 
+class SmartlivingConfigData(TypedDict):
+    port: int
+    password: str          # TCP password of the SmartLAN board, "" when off
+    pin: str | None        # user code for the commands
+
+
 class InimPrimeConfigData(TypedDict):
     """Shape of entry.data as actually stored on disk."""
     serial_number: str
     host: str
     native: NotRequired[NativeConfigData]
     primelan: NotRequired[PrimelanConfigData]
+    smartliving: NotRequired[SmartlivingConfigData]
 
 
 class ScanIntervalsData(TypedDict):

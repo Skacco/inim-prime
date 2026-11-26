@@ -4,11 +4,12 @@
     "step": {
       "user": {
         "title": "Configure INIM Prime",
-        "description": "Choose which integration mode(s) to use for this panel.\n\n• Native — zones, partitions, arm/disarm, outputs, timers and roller shutters. Fast local polling.\n• PrimeLAN — adds scenarios, GSM status, system faults and the event log.\n• Both — all of the above (Native is used where it can, PrimeLAN for the rest).\n\nNative only still covers the essentials; PrimeLAN requires the PrimeLAN card and its API key.",
+        "description": "Choose which integration mode(s) to use for this panel.\n\n• Native — zones, partitions, arm/disarm, outputs, timers and roller shutters. Fast local polling.\n• PrimeLAN — adds scenarios, GSM status, system faults and the event log.\n• Both — all of the above (Native is used where it can, PrimeLAN for the rest).\n\nNative only still covers the essentials; PrimeLAN requires the PrimeLAN card and its API key.\n• SmartLiving (beta) — Inim SmartLiving panels with a SmartLAN/SI or SmartLAN/G board, locally.",
         "menu_options": {
           "native_only": "Native only",
           "primelan_only": "PrimeLAN only",
-          "both": "Native + PrimeLAN"
+          "both": "Native + PrimeLAN",
+          "smartliving": "SmartLiving (beta)"
         }
       },
       "serial_number": {
@@ -225,6 +226,26 @@
             "description": "For each shutter (numbered by its Mod.dom module) give it an optional name (also used as the cover name, e.g. \"Sala\") and choose the panel command output that opens it and the one that closes it (e.g. \"Apri tenda sala\" / \"Chiudi ... sala\"). The Smart module runs the full travel from a single trigger and has no stop. You can also set 25/50/75% commands (partial-open outputs) to enable the position slider, which snaps to the nearest one. Leave empty to leave a shutter unmapped."
           }
         }
+      },
+      "smartliving": {
+        "title": "SmartLiving panel (beta)",
+        "description": "Address of the panel's SmartLAN board.\n\nThe TCP password is needed only if it is enabled on the board (SmartLeague). The user PIN is needed to arm, disarm and exclude zones: without it the integration only reads.\n\nWhile the integration is connected, SmartLeague and apps connecting locally cannot: the board accepts one connection at a time.{error}",
+        "data": {
+          "host": "IP address",
+          "port": "Port",
+          "password": "TCP password (if enabled)",
+          "pin": "User PIN"
+        }
+      },
+      "reconfigure_smartliving": {
+        "title": "Reconfigure the SmartLiving panel",
+        "description": "Address of the panel's SmartLAN board.\n\nThe TCP password is needed only if it is enabled on the board (SmartLeague). The user PIN is needed to arm, disarm and exclude zones: without it the integration only reads.\n\nWhile the integration is connected, SmartLeague and apps connecting locally cannot: the board accepts one connection at a time.{error}",
+        "data": {
+          "host": "IP address",
+          "port": "Port",
+          "password": "TCP password (if enabled)",
+          "pin": "User PIN"
+        }
       }
     },
     "error": {
@@ -233,12 +254,16 @@
       "native_password_rejected": "The panel did not accept the Native connection password.{status}",
       "native_port_exposed": "Native port {port} of the panel can be reached from the Internet: remove its forwarding on the router and try again. To go on anyway turn the port check off.",
       "native_port_check_failed": "Native port check failed: the check service did not answer, so it is not known whether port {port} can be reached from the Internet. Try again, change the check service or turn the port check off.",
-      "native_password_too_long": "The Native connection password can be at most {max} characters long."
+      "native_password_too_long": "The Native connection password can be at most {max} characters long.",
+      "smartliving_cannot_connect": "Could not connect. Check address and port, that SmartLeague or an app is not connected, and the TCP password if enabled on the board.",
+      "smartliving_unsupported": "Unsupported panel model.",
+      "invalid_pin": "The PIN must be 4 to 6 digits."
     },
     "abort": {
       "already_configured": "This INIM Prime panel is already configured.",
       "reconfigure_successful": "The INIM Prime panel was reconfigured successfully.",
-      "reconfigure_successful_port_closed": "The INIM Prime panel was reconfigured successfully. Native port check passed: port {port} cannot be reached from the Internet."
+      "reconfigure_successful_port_closed": "The INIM Prime panel was reconfigured successfully. Native port check passed: port {port} cannot be reached from the Internet.",
+      "smartliving_other_panel": "A different panel answers at that address."
     }
   },
   "options": {

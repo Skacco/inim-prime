@@ -100,6 +100,9 @@ PRIMELAN_USE_HTTPS_DEFAULT: Final[bool] = True
 # --- Defaults (custom per coordinator) ---
 ZONES_SCAN_INTERVAL_NATIVE_DEFAULT: Final[int] = 500
 PARTITIONS_SCAN_INTERVAL_NATIVE_DEFAULT: Final[int] = 500
+# SmartLiving: zones and areas share the same reads; the board wants >= 0.5 s.
+SMARTLIVING_SCAN_INTERVAL_DEFAULT: Final[int] = 1000
+SMARTLIVING_DEFAULT_PORT: Final[int] = 5004
 
 ZONES_SCAN_INTERVAL_PRIMELAN_DEFAULT: Final[int] = 5000
 PARTITIONS_SCAN_INTERVAL_PRIMELAN_DEFAULT: Final[int] = 5000

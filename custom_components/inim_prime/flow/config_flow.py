@@ -33,8 +33,16 @@ from ..const import (
     SCENARIOS_SCAN_INTERVAL_PRIMELAN_DEFAULT,
     PANEL_LOG_EVENTS_FETCH_LIMIT_DEFAULT,
     PRIMELAN_SCAN_INTERVAL_BOTH_DEFAULT,
+    SMARTLIVING_DEFAULT_PORT,
+    SMARTLIVING_SCAN_INTERVAL_DEFAULT,
 )
 from ..entry_data import get_entry_data, get_entry_options
+from ..smartliving import (
+    Client as SmartLivingClient,
+    SmartLivingConnectionError,
+    SmartLivingError,
+    UnsupportedModelError,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -180,7 +188,76 @@ class InimPrimeConfigFlow(config_entries.ConfigFlow, domain = DOMAIN):
     async def async_step_user(self, user_input: dict[str, Any] | None = None):
         return self.async_show_menu(
             step_id = "user",
-            menu_options = ["native_only", "primelan_only", "both"],
+            menu_options = ["native_only", "primelan_only", "both", "smartliving"],
+        )
+
+    # ------------------------------------------------------------------
+    # SmartLiving panels (SmartLAN board): a path of its own
+    # ------------------------------------------------------------------
+    async def async_step_smartliving(self, user_input: dict[str, Any] | None = None):
+        errors: dict[str, str] = {}
+        placeholders: dict[str, str] = {"error": ""}
+        if user_input is not None:
+            host = user_input[DataKey.HOST].strip()
+            port = int(user_input[DataKey.Native.PORT])
+            password = (user_input.get(DataKey.Native.PASSWORD) or "").strip()
+            pin = (user_input.get(DataKey.Native.PIN) or "").strip()
+            if pin and not (pin.isdigit() and 4 <= len(pin) <= 6):
+                errors[DataKey.Native.PIN] = "invalid_pin"
+            else:
+                client = SmartLivingClient(host = host, port = port, password = password or None)
+                try:
+                    config = await client.read_configuration()
+                except UnsupportedModelError as err:
+                    errors["base"] = "smartliving_unsupported"
+                    placeholders["error"] = f"\n\n{err}"
+                except SmartLivingConnectionError as err:
+                    errors["base"] = "smartliving_cannot_connect"
+                    placeholders["error"] = f"\n\n{err}"
+                except (SmartLivingError, OSError) as err:
+                    errors["base"] = "smartliving_cannot_connect"
+                    placeholders["error"] = f"\n\n{err}"
+                finally:
+                    await client.close()
+                if not errors:
+                    serial = config.info.serial or f"smartliving_{host}"
+                    await self.async_set_unique_id(serial)
+                    self._abort_if_unique_id_configured()
+                    options = ConfigOptions()
+                    options.hide_unused_partitions = True
+                    options.zones_scan_interval = SMARTLIVING_SCAN_INTERVAL_DEFAULT
+                    options.partitions_scan_interval = SMARTLIVING_SCAN_INTERVAL_DEFAULT
+                    return self.async_create_entry(
+                        title = f"INIM SmartLiving {config.info.model} ({serial})",
+                        data = {
+                            DataKey.SERIAL_NUMBER: serial,
+                            DataKey.HOST: host,
+                            "smartliving": {
+                                "port": port,
+                                "password": password,
+                                "pin": pin or None,
+                            },
+                        },
+                        options = options.to_options_dict(),
+                    )
+        defaults = user_input or {}
+        schema = vol.Schema({
+            vol.Required(DataKey.HOST, default = defaults.get(DataKey.HOST, "")): str,
+            vol.Required(
+                DataKey.Native.PORT, default = defaults.get(DataKey.Native.PORT, SMARTLIVING_DEFAULT_PORT),
+            ): vol.All(vol.Coerce(int), vol.Range(min = 1, max = 65535)),
+            vol.Optional(
+                DataKey.Native.PASSWORD,
+                description = {"suggested_value": defaults.get(DataKey.Native.PASSWORD)},
+            ): str,
+            vol.Optional(
+                DataKey.Native.PIN,
+                description = {"suggested_value": defaults.get(DataKey.Native.PIN)},
+            ): str,
+        })
+        return self.async_show_form(
+            step_id = "smartliving", data_schema = schema,
+            errors = errors, description_placeholders = placeholders,
         )
 
     async def async_step_native_only(self, user_input: dict[str, Any] | None = None):
@@ -385,6 +462,8 @@ class InimPrimeConfigFlow(config_entries.ConfigFlow, domain = DOMAIN):
         self._options.hide_unused_partitions = options.get("hide_unused_partitions")
 
     async def async_step_reconfigure(self, user_input: dict[str, Any] | None = None):
+        if get_entry_data(self._get_reconfigure_entry()).get("smartliving"):
+            return await self.async_step_reconfigure_smartliving()
         # Populate self._data/self._options from the existing entry only
         # once (first time this flow instance reaches this step).
         if self._data.serial_number is None:
@@ -395,6 +474,59 @@ class InimPrimeConfigFlow(config_entries.ConfigFlow, domain = DOMAIN):
         return self.async_show_menu(
             step_id = "reconfigure",
             menu_options = await self._reconfigure_menu(),
+        )
+
+    async def async_step_reconfigure_smartliving(self, user_input: dict[str, Any] | None = None):
+        """Same panel, new address, password or PIN."""
+        entry = self._get_reconfigure_entry()
+        data = get_entry_data(entry)
+        current = data["smartliving"]
+        errors: dict[str, str] = {}
+        placeholders: dict[str, str] = {"error": ""}
+        if user_input is not None:
+            host = user_input[DataKey.HOST].strip()
+            port = int(user_input[DataKey.Native.PORT])
+            password = (user_input.get(DataKey.Native.PASSWORD) or "").strip()
+            pin = (user_input.get(DataKey.Native.PIN) or "").strip()
+            if pin and not (pin.isdigit() and 4 <= len(pin) <= 6):
+                errors[DataKey.Native.PIN] = "invalid_pin"
+            else:
+                client = SmartLivingClient(host = host, port = port, password = password or None)
+                try:
+                    config = await client.read_configuration()
+                except (SmartLivingError, OSError) as err:
+                    errors["base"] = "smartliving_cannot_connect"
+                    placeholders["error"] = f"\n\n{err}"
+                finally:
+                    await client.close()
+                if not errors:
+                    serial = config.info.serial or f"smartliving_{host}"
+                    if serial != entry.unique_id:
+                        return self.async_abort(reason = "smartliving_other_panel")
+                    return self.async_update_reload_and_abort(
+                        entry,
+                        data = {
+                            **data,
+                            DataKey.HOST: host,
+                            "smartliving": {"port": port, "password": password, "pin": pin or None},
+                        },
+                    )
+        values = user_input or {
+            DataKey.HOST: data[DataKey.HOST],
+            DataKey.Native.PORT: current["port"],
+            DataKey.Native.PASSWORD: current.get("password") or "",
+            DataKey.Native.PIN: current.get("pin") or "",
+        }
+        schema = vol.Schema({
+            vol.Required(DataKey.HOST, default = values.get(DataKey.HOST, "")): str,
+            vol.Required(DataKey.Native.PORT, default = values.get(DataKey.Native.PORT, SMARTLIVING_DEFAULT_PORT)):
+                vol.All(vol.Coerce(int), vol.Range(min = 1, max = 65535)),
+            vol.Optional(DataKey.Native.PASSWORD, description = {"suggested_value": values.get(DataKey.Native.PASSWORD)}): str,
+            vol.Optional(DataKey.Native.PIN, description = {"suggested_value": values.get(DataKey.Native.PIN)}): str,
+        })
+        return self.async_show_form(
+            step_id = "reconfigure_smartliving", data_schema = schema,
+            errors = errors, description_placeholders = placeholders,
         )
 
     async def _reconfigure_menu(self) -> dict[str, str]:

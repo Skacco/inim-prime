@@ -15,6 +15,7 @@ from dataclasses import replace
 from types import MappingProxyType
 
 from .adapters.native_adapter import NativeAdapter
+from .adapters.smartliving_adapter import SmartLivingAdapter
 from .models.timers import UnifiedTimer
 from .adapters.primelan_adapter import PrimelanAdapter
 
@@ -56,12 +57,16 @@ class InimPrimeGateway:
             self,
             native: NativeAdapter | None = None,
             primelan: PrimelanAdapter | None = None,
+            smartliving: SmartLivingAdapter | None = None,
     ) -> None:
-        if native is None and primelan is None:
+        if native is None and primelan is None and smartliving is None:
             raise ValueError("InimPrimeGateway requires at least one backend")
 
         self._native = native
         self._primelan = primelan
+        # SmartLiving panels: a backend of its own, never combined with the
+        # Prime ones. It serves zones, areas and their commands.
+        self._smartliving = smartliving
         # Output labels from PrimeLAN, used to name native outputs whose
         # label the native protocol does not carry.
         self._primelan_output_labels: dict[int, str] | None = None
@@ -83,7 +88,9 @@ class InimPrimeGateway:
 
         # Preferred backend for anything both sides support equally.
 
-        self._preferred: NativeAdapter | PrimelanAdapter = native or primelan
+        self._preferred: NativeAdapter | PrimelanAdapter | SmartLivingAdapter = (
+            native or primelan or smartliving
+        )
 
     # ------------------------------------------------------------------
     # Capabilities -- used by __init__.py / platform files to decide which
@@ -91,11 +98,11 @@ class InimPrimeGateway:
     # ------------------------------------------------------------------
     @property
     def supports_zones(self) -> bool:
-        return self._native is not None or self._primelan is not None
+        return self._native is not None or self._primelan is not None or self._smartliving is not None
 
     @property
     def supports_partitions(self) -> bool:
-        return self._native is not None or self._primelan is not None
+        return self._native is not None or self._primelan is not None or self._smartliving is not None
 
     @property
     def supports_gsm(self) -> bool:
@@ -128,6 +135,10 @@ class InimPrimeGateway:
     @property
     def primelan_adapter(self) -> PrimelanAdapter | None:
         return self._primelan
+
+    @property
+    def smartliving_adapter(self) -> SmartLivingAdapter | None:
+        return self._smartliving
 
     @property
     def timers(self) -> MappingProxyType[int, UnifiedTimer] | None:
@@ -184,6 +195,8 @@ class InimPrimeGateway:
             active.append("native")
         if self._primelan is not None:
             active.append("primelan")
+        if self._smartliving is not None:
+            active.append("smartliving")
         return active
 
     # ------------------------------------------------------------------
@@ -198,6 +211,8 @@ class InimPrimeGateway:
             tasks.append(self._native.connect())
         if self._primelan is not None:
             tasks.append(self._primelan.connect())
+        if self._smartliving is not None:
+            tasks.append(self._smartliving.connect())
         if tasks:
             await asyncio.gather(*tasks)
 
@@ -206,6 +221,8 @@ class InimPrimeGateway:
             await self._native.close()
         if self._primelan is not None:
             await self._primelan.close()
+        if self._smartliving is not None:
+            await self._smartliving.close()
 
     # ------------------------------------------------------------------
     # Cached reads -- no I/O. Safe to call from anywhere, anytime.

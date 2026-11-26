@@ -106,6 +106,12 @@ class InimPrimeOptionsFlowHandler(OptionsFlowWithReload):
 
     @property
     def _has_native(self) -> bool:
+        """Native, or SmartLiving: both arm by areas and poll a TCP link."""
+        data = get_entry_data(self.config_entry)
+        return bool(data.get("native") or data.get("smartliving"))
+
+    @property
+    def _has_native_prime(self) -> bool:
         return bool(get_entry_data(self.config_entry).get("native"))
 
     @property
@@ -143,7 +149,7 @@ class InimPrimeOptionsFlowHandler(OptionsFlowWithReload):
         shutters, _ = self._shutter_context()
         if shutters:
             options.append("shutters")
-        if self._has_native:
+        if self._has_native_prime:
             options.append("port_check")
         options.append("save_exit")
         return self.async_show_menu(step_id="init", menu_options=options)
