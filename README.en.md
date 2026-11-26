@@ -1,17 +1,14 @@
 🇮🇹 [Italiano](README.md) · 🇬🇧 **English**
 
-> **Project maintained by [Skacco](https://github.com/Skacco).** Built on the work of [Pitscheider](https://github.com/Pitscheider/ha-inim-prime) (GPL-3.0), author of the original integration and of the panel communication libraries. This project adds: the **Native mode** (local TCP protocol, fast), **outputs** (switches; dimmable ones as lights only in PrimeLAN mode), **scenarios** (buttons + active scenario sensor), an **alarm panel** driven by scenarios or partitions (with an optional second **PIN**-protected panel), **timers**, **thermostats** (temperature sensors), **roller shutters** (driven by virtual outputs), **realtime push** (local webhook, optional), device grouping and the **Italian interface**.
+> **Project maintained by [Skacco](https://github.com/Skacco).** Built on the work of [Pitscheider](https://github.com/Pitscheider/ha-inim-prime) (GPL-3.0), author of the original integration and of the panel communication libraries. This project adds: support for **SmartLiving** panels, the **Native mode** (local TCP protocol, fast), **outputs** (switches; dimmable ones as lights only in PrimeLAN mode), **scenarios** (buttons + active scenario sensor), an **alarm panel** driven by scenarios or partitions (with an optional second **PIN**-protected panel), **timers**, **thermostats** (temperature sensors), **roller shutters** (driven by virtual outputs), **realtime push** (local webhook, optional), device grouping and the **Italian interface**.
 
 ⭐ If you find this integration useful, star the repository: it helps others find it.
 
 # Introduction
-This custom integration lets Home Assistant communicate with **Inim Prime alarm panels** and with **Inim SmartLiving** panels.
+This custom integration lets Home Assistant communicate with **Inim Prime** and **Inim SmartLiving** alarm panels.
 
-### SmartLiving
-**Inim SmartLiving** panels with a **SmartLAN/SI** or **SmartLAN/G** board, locally (TCP port **5004**): zones, partitions with arm and disarm, zone bypass, outputs, scenarios with the active one and the event log. Reads verified on a SmartLiving 1050; commands and other models (10100, 515, 505) being tested. Pick **SmartLiving** at the start of the setup. The SmartLAN protocol is **not encrypted**: do not expose its port on the Internet (setup and options have "🌐 Check SmartLAN port").
-
-## Integration modes
-You can use two integration modes, **separately or together**. You choose during the integration setup.
+## Inim Prime — integration modes
+With Prime panels you can use two integration modes, **separately or together**. You choose during the integration setup.
 
 ### Native — local protocol (TCP)
 Talks **directly to the panel** on the local protocol port (TCP, default **6004**), with AES encryption. It is the **fast, fully local** channel: it does not go through the cloud or the Web API.
@@ -38,7 +35,10 @@ It requires the **PrimeLAN network board** installed in the panel.
 ### Both (recommended)
 You enable the two integration modes together: **Native** does all the fast local work (zones, partitions, outputs, shutters, thermostats, timers, scenarios, faults and the log), **PrimeLAN** adds GSM and realtime push. The Home Assistant **alarm panel** combines scenarios and partitions: for each command you pick a scenario or a set of partitions.
 
-## Firmware compatibility
+## Inim SmartLiving
+**Inim SmartLiving** panels with a **SmartLAN/SI** or **SmartLAN/G** board, locally (TCP port **5004**): zones, partitions with arm and disarm, zone bypass, outputs, scenarios with the active one and the event log. Reads verified on a SmartLiving 1050; commands and other models (10100, 515, 505) being tested. Pick **SmartLiving** at the start of the setup. The SmartLAN protocol is **not encrypted**: do not expose its port on the Internet (setup and options have "🌐 Check SmartLAN port").
+
+## Firmware compatibility (Prime)
 Tested with panels on both **firmware 4.x** and **firmware 5.x**.
 
 The project is **community developed**, **not affiliated with INIM Electronics**, and is meant to **complement — not replace** the official Inim software.
@@ -277,7 +277,6 @@ data:
 ```
 
 The answer has `dal`, `al`, `totale`, `periodiche` and `altre` and the `cadute` list, each with `inizio`, `periodica` and the duration of each connection that dropped (`native_secondi`, `primelan_secondi`). When the panel restarts its network Native and PrimeLAN drop together: that counts as one drop. When only one of the two dropped, the totals say so in brackets (for example `2 (solo Native 1)`). The history covers what Home Assistant's recorder keeps (10 days by default).
-
 
 # Recommended configuration
 ## Rename the devices

@@ -1,17 +1,14 @@
 🇮🇹 **Italiano** · 🇬🇧 [English](README.en.md)
 
-> **Progetto mantenuto da [Skacco](https://github.com/Skacco).** Nato dal lavoro di [Pitscheider](https://github.com/Pitscheider/ha-inim-prime) (GPL-3.0), autore dell'integrazione originale e delle librerie di comunicazione con la centrale. Questo progetto aggiunge: la **modalità Native** (protocollo locale TCP, veloce), le **uscite** (interruttori; le dimmerabili come luci solo in modalità PrimeLAN), gli **scenari** (pulsanti + sensore scenario attivo), un **pannello di allarme** guidato dagli scenari o dalle aree (con un secondo pannello protetto da **PIN**, facoltativo), i **timer**, i **termostati** (sensori di temperatura), le **tapparelle** (comandate dalle uscite virtuali), il **push in tempo reale** (webhook locale, opzionale), il raggruppamento dei dispositivi e l'**interfaccia in italiano**.
+> **Progetto mantenuto da [Skacco](https://github.com/Skacco).** Nato dal lavoro di [Pitscheider](https://github.com/Pitscheider/ha-inim-prime) (GPL-3.0), autore dell'integrazione originale e delle librerie di comunicazione con la centrale. Questo progetto aggiunge: il supporto alle centrali **SmartLiving**, la **modalità Native** (protocollo locale TCP, veloce), le **uscite** (interruttori; le dimmerabili come luci solo in modalità PrimeLAN), gli **scenari** (pulsanti + sensore scenario attivo), un **pannello di allarme** guidato dagli scenari o dalle aree (con un secondo pannello protetto da **PIN**, facoltativo), i **timer**, i **termostati** (sensori di temperatura), le **tapparelle** (comandate dalle uscite virtuali), il **push in tempo reale** (webhook locale, opzionale), il raggruppamento dei dispositivi e l'**interfaccia in italiano**.
 
 ⭐ Se l'integrazione ti è utile, lascia una stella al repository: aiuta altri a trovarla.
 
 # Introduzione
-Questa integrazione personalizzata permette a Home Assistant di comunicare con le **centrali di allarme Inim Prime** e con le **Inim SmartLiving**.
+Questa integrazione personalizzata permette a Home Assistant di comunicare con le centrali di allarme **Inim Prime** e **Inim SmartLiving**.
 
-### SmartLiving
-Centrali **Inim SmartLiving** con scheda **SmartLAN/SI** o **SmartLAN/G**, in locale (porta TCP **5004**): zone, aree con inserimento e disinserimento, esclusione zone, uscite, scenari con scenario attivo e registro eventi. Letture verificate su una SmartLiving 1050; comandi e altri modelli (10100, 515, 505) in prova. Si sceglie **SmartLiving** all'inizio della configurazione. Il protocollo SmartLAN **non è cifrato**: non esporre la porta su Internet (in configurazione e nelle opzioni c'è «🌐 Controlla porta SmartLAN»).
-
-## Modalità di integrazione
-Puoi usare due modalità di integrazione, **singolarmente o insieme**. La scelta si fa durante la configurazione dell'integrazione.
+## Inim Prime — modalità di integrazione
+Con le centrali Prime puoi usare due modalità di integrazione, **singolarmente o insieme**. La scelta si fa durante la configurazione dell'integrazione.
 
 ### Native — protocollo locale (TCP)
 Comunica **direttamente con la centrale** sulla porta del protocollo locale (TCP, default **6004**), con cifratura AES. È il canale **veloce e completamente locale**: non passa dal cloud né dalla Web API.
@@ -38,7 +35,10 @@ Richiede la **scheda di rete PrimeLAN** installata nella centrale.
 ### Entrambi (consigliato)
 Attivi le due modalità di integrazione insieme: **Native** fa tutto il lavoro locale e veloce (zone, aree, uscite, tapparelle, termostati, timer, scenari, guasti e registro), **PrimeLAN** aggiunge GSM e push in tempo reale. Il **pannello di allarme** di Home Assistant unisce scenari e aree: per ogni comando scegli uno scenario o un insieme di aree.
 
-## Compatibilità firmware
+## Inim SmartLiving
+Centrali **Inim SmartLiving** con scheda **SmartLAN/SI** o **SmartLAN/G**, in locale (porta TCP **5004**): zone, aree con inserimento e disinserimento, esclusione zone, uscite, scenari con scenario attivo e registro eventi. Letture verificate su una SmartLiving 1050; comandi e altri modelli (10100, 515, 505) in prova. Si sceglie **SmartLiving** all'inizio della configurazione. Il protocollo SmartLAN **non è cifrato**: non esporre la porta su Internet (in configurazione e nelle opzioni c'è «🌐 Controlla porta SmartLAN»).
+
+## Compatibilità firmware (Prime)
 Testata sia con centrali a **firmware 4.x** sia a **firmware 5.x**.
 
 Il progetto è **sviluppato dalla community**, **non affiliato a INIM Electronics**, ed è pensato per **affiancare — non sostituire** il software ufficiale Inim.
@@ -278,7 +278,6 @@ data:
 ```
 
 La risposta contiene `dal`, `al`, `totale`, `periodiche` e `altre` e l'elenco `cadute`, ognuna con `inizio`, `periodica` e la durata di ogni connessione caduta (`native_secondi`, `primelan_secondi`). Quando la centrale riavvia la rete cadono insieme Native e PrimeLAN: conta come una sola caduta. Se è caduta una sola delle due connessioni, i totali lo indicano tra parentesi (per esempio `2 (solo Native 1)`). Lo storico copre il periodo conservato dal registratore di Home Assistant (di default 10 giorni).
-
 
 # Configurazione consigliata
 ## Rinomina i dispositivi
