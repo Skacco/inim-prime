@@ -186,9 +186,16 @@ class InimPrimeConfigFlow(config_entries.ConfigFlow, domain = DOMAIN):
     # Step 1: backend choice
     # ------------------------------------------------------------------
     async def async_step_user(self, user_input: dict[str, Any] | None = None):
+        """First the panel family, then (Prime) how to connect to it."""
         return self.async_show_menu(
             step_id = "user",
-            menu_options = ["native_only", "primelan_only", "both", "smartliving"],
+            menu_options = ["prime", "smartliving"],
+        )
+
+    async def async_step_prime(self, user_input: dict[str, Any] | None = None):
+        return self.async_show_menu(
+            step_id = "prime",
+            menu_options = ["native_only", "primelan_only", "both"],
         )
 
     # ------------------------------------------------------------------

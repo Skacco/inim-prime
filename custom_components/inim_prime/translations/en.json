@@ -3,13 +3,20 @@
   "config": {
     "step": {
       "user": {
+        "title": "Add Inim panel",
+        "description": "Choose the panel type.",
+        "menu_options": {
+          "prime": "Inim Prime",
+          "smartliving": "Inim SmartLiving (beta)"
+        }
+      },
+      "prime": {
         "title": "Configure INIM Prime",
-        "description": "Choose which integration mode(s) to use for this panel.\n\n• Native — zones, partitions, arm/disarm, outputs, timers, roller shutters, scenarios, faults and the event log. Fast local polling.\n• PrimeLAN — adds GSM status and realtime notifications.\n• Both — all of the above (Native is used where it can, PrimeLAN for the rest).\n\nNative only still covers the essentials; PrimeLAN requires the PrimeLAN card and its API key.\n• SmartLiving (beta) — Inim SmartLiving panels with a SmartLAN/SI or SmartLAN/G board, locally.",
+        "description": "Choose which integration mode(s) to use for this panel.\n\n• Native — zones, partitions, arm/disarm, outputs, timers, roller shutters, scenarios, faults and the event log. Fast local polling.\n• PrimeLAN — adds GSM status and realtime notifications.\n• Both — all of the above (Native is used where it can, PrimeLAN for the rest).\n\nNative only still covers the essentials; PrimeLAN requires the PrimeLAN card and its API key.",
         "menu_options": {
           "native_only": "Native only",
           "primelan_only": "PrimeLAN only",
-          "both": "Native + PrimeLAN",
-          "smartliving": "SmartLiving (beta)"
+          "both": "Native + PrimeLAN"
         }
       },
       "serial_number": {

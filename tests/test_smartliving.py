@@ -111,7 +111,11 @@ async def test_config_flow_creates_a_smartliving_entry(hass: HomeAssistant):
     with _patched(panel), patch("custom_components.inim_prime.async_setup_entry", return_value=True):
         result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
         assert result["type"] is FlowResultType.MENU
-        assert "smartliving" in result["menu_options"]
+        # first the panel type: Prime (then how to connect) or SmartLiving
+        assert result["menu_options"] == ["prime", "smartliving"]
+        prime = await hass.config_entries.flow.async_configure(result["flow_id"], {"next_step_id": "prime"})
+        assert prime["menu_options"] == ["native_only", "primelan_only", "both"]
+        result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
         result = await hass.config_entries.flow.async_configure(result["flow_id"], {"next_step_id": "smartliving"})
         assert result["step_id"] == "smartliving"
         result = await hass.config_entries.flow.async_configure(

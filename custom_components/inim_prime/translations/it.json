@@ -3,13 +3,20 @@
   "config": {
     "step": {
       "user": {
+        "title": "Aggiungi centrale Inim",
+        "description": "Scegli il tipo di centrale.",
+        "menu_options": {
+          "prime": "Inim Prime",
+          "smartliving": "Inim SmartLiving (beta)"
+        }
+      },
+      "prime": {
         "title": "Configura INIM Prime",
-        "description": "Scegli quali modalità di integrazione usare per questa centrale.\n\n• Native — zone, aree, inserimento/disinserimento, uscite, timer, tapparelle, scenari, guasti e registro eventi. Polling locale veloce.\n• PrimeLAN — aggiunge stato GSM e notifiche in tempo reale.\n• Entrambi — tutto quanto sopra (Native dove può, PrimeLAN per il resto).\n\nSolo Native copre comunque l'essenziale; PrimeLAN richiede la scheda PrimeLAN e la sua chiave API.\n• SmartLiving (beta) — centrali Inim SmartLiving con scheda SmartLAN/SI o SmartLAN/G, in locale.",
+        "description": "Scegli quali modalità di integrazione usare per questa centrale.\n\n• Native — zone, aree, inserimento/disinserimento, uscite, timer, tapparelle, scenari, guasti e registro eventi. Polling locale veloce.\n• PrimeLAN — aggiunge stato GSM e notifiche in tempo reale.\n• Entrambi — tutto quanto sopra (Native dove può, PrimeLAN per il resto).\n\nSolo Native copre comunque l'essenziale; PrimeLAN richiede la scheda PrimeLAN e la sua chiave API.",
         "menu_options": {
           "native_only": "Solo Native",
           "primelan_only": "Solo PrimeLAN",
-          "both": "Native + PrimeLAN",
-          "smartliving": "SmartLiving (beta)"
+          "both": "Native + PrimeLAN"
         }
       },
       "serial_number": {
