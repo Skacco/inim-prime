@@ -5,7 +5,10 @@
 ⭐ Se l'integrazione ti è utile, lascia una stella al repository: aiuta altri a trovarla.
 
 # Introduzione
-Questa integrazione personalizzata permette a Home Assistant di comunicare con le **centrali di allarme Inim Prime**.
+Questa integrazione personalizzata permette a Home Assistant di comunicare con le **centrali di allarme Inim Prime** e, in beta, con le **Inim SmartLiving**.
+
+### SmartLiving (beta)
+Centrali **Inim SmartLiving** con scheda **SmartLAN/SI** o **SmartLAN/G**, in locale (porta TCP **5004**): zone, aree con inserimento e disinserimento, esclusione zone, uscite, scenari con scenario attivo e registro eventi. Letture verificate su una SmartLiving 1050; comandi e altri modelli (10100, 515, 505) in prova. Si sceglie **SmartLiving** all'inizio della configurazione.
 
 ## Modalità di integrazione
 Puoi usare due modalità di integrazione, **singolarmente o insieme**. La scelta si fa durante la configurazione dell'integrazione.
