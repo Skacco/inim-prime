@@ -5,9 +5,9 @@
 ⭐ If you find this integration useful, star the repository: it helps others find it.
 
 # Introduction
-This custom integration lets Home Assistant communicate with **Inim Prime alarm panels** and, in beta, with **Inim SmartLiving** panels.
+This custom integration lets Home Assistant communicate with **Inim Prime alarm panels** and with **Inim SmartLiving** panels.
 
-### SmartLiving (beta)
+### SmartLiving
 **Inim SmartLiving** panels with a **SmartLAN/SI** or **SmartLAN/G** board, locally (TCP port **5004**): zones, partitions with arm and disarm, zone bypass, outputs, scenarios with the active one and the event log. Reads verified on a SmartLiving 1050; commands and other models (10100, 515, 505) being tested. Pick **SmartLiving** at the start of the setup.
 
 ## Integration modes
