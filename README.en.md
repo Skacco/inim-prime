@@ -125,7 +125,7 @@ How often Home Assistant polls the panel (lower values = more traffic). The scre
 | Scenarios, faults, events | ✅ | ✅ | ✅ |
 | GSM | — | ✅ | ✅ |
 
-With Native configured, zones, partitions, outputs, scenarios, faults and events come from Native; GSM always comes from PrimeLAN.
+With Native configured, zones, partitions, outputs, scenarios, faults and events come from Native; GSM always comes from PrimeLAN. Values are in milliseconds; scenarios, faults, events and GSM have a 1000 ms minimum.
 
 ⚠️ The **Native** mode supports much lower intervals than PrimeLAN for zones, partitions and outputs (local polling).
 

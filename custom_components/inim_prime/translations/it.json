@@ -393,7 +393,7 @@
       },
       "scan": {
         "title": "Intervalli di scansione",
-        "description": "Ogni quanto Home Assistant interroga la centrale (valori più bassi = più traffico). {sources} Dettagli nel README.",
+        "description": "Ogni quanto Home Assistant interroga la centrale, in millisecondi (valori più bassi = più traffico).\n\n{sources}\n\nScenari, guasti, eventi e GSM: minimo 1000 ms. Dettagli nel README.",
         "data": {
           "zones": "Intervallo scansione zone",
           "partitions": "Intervallo scansione aree",

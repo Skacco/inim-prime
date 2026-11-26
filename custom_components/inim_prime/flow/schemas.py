@@ -37,6 +37,7 @@ from ..const import (
     NATIVE_USE_OUTER_FRAME_DEFAULT,
     SHUTTER_COMMAND_FIELDS,
     SCAN_INTERVAL_MIN,
+    SCAN_INTERVAL_MIN_SLOW,
     SCAN_INTERVAL_MAX,
     PANEL_LOG_EVENTS_FETCH_LIMIT_DEFAULT,
     PANEL_LOG_EVENTS_FETCH_LIMIT_MIN,
@@ -263,6 +264,7 @@ def build_scan_intervals_schema(
         outputs = OUTPUTS_SCAN_INTERVAL_NATIVE_DEFAULT if has_native else OUTPUTS_SCAN_INTERVAL_PRIMELAN_DEFAULT,
         scenarios = SCENARIOS_SCAN_INTERVAL_NATIVE_DEFAULT if has_native else SCENARIOS_SCAN_INTERVAL_PRIMELAN_DEFAULT,
     )
+    scenarios_default = scan_intervals_defaults["scenarios"]
 
     if current_options is not None:
         # In case the user is migrating from native or primelan does not use the existing intervals for zones and partitions
@@ -278,6 +280,13 @@ def build_scan_intervals_schema(
         scan_intervals_defaults["gsm"] = current_options.gsm_scan_interval if current_options.gsm_scan_interval is not None else scan_intervals_defaults["gsm"]
         scan_intervals_defaults["system_faults"] = current_options.system_faults_scan_interval if current_options.system_faults_scan_interval is not None else scan_intervals_defaults["system_faults"]
         scan_intervals_defaults["panel_log_events"] = current_options.panel_log_events_scan_interval if current_options.panel_log_events_scan_interval is not None else scan_intervals_defaults["panel_log_events"]
+        # a value below the minimum (e.g. seconds typed as milliseconds) is
+        # offered back as the default for this setup
+        defaults = {"scenarios": scenarios_default, "system_faults": faults_default,
+                    "panel_log_events": log_default, "gsm": gsm_default}
+        for key, default in defaults.items():
+            if scan_intervals_defaults[key] < SCAN_INTERVAL_MIN_SLOW:
+                scan_intervals_defaults[key] = default
 
     scan_interval_fields: dict = {
         vol.Required(
@@ -315,7 +324,7 @@ def build_scan_intervals_schema(
             OptionsKey.ScanIntervals.SCENARIOS,
             default = scan_intervals_defaults["scenarios"],
         )] = NumberSelector(NumberSelectorConfig(
-            min = SCAN_INTERVAL_MIN,
+            min = SCAN_INTERVAL_MIN_SLOW,
             max = SCAN_INTERVAL_MAX,
             mode = NumberSelectorMode.BOX,
             unit_of_measurement = "ms",
@@ -325,7 +334,7 @@ def build_scan_intervals_schema(
             OptionsKey.ScanIntervals.SYSTEM_FAULTS,
             default = scan_intervals_defaults["system_faults"],
         )] = NumberSelector(NumberSelectorConfig(
-            min = SCAN_INTERVAL_MIN,
+            min = SCAN_INTERVAL_MIN_SLOW,
             max = SCAN_INTERVAL_MAX,
             mode = NumberSelectorMode.BOX,
             unit_of_measurement = "ms",
@@ -335,7 +344,7 @@ def build_scan_intervals_schema(
             OptionsKey.ScanIntervals.PANEL_LOG_EVENTS,
             default = scan_intervals_defaults["panel_log_events"],
         )] = NumberSelector(NumberSelectorConfig(
-            min = SCAN_INTERVAL_MIN,
+            min = SCAN_INTERVAL_MIN_SLOW,
             max = SCAN_INTERVAL_MAX,
             mode = NumberSelectorMode.BOX,
             unit_of_measurement = "ms",
@@ -346,7 +355,7 @@ def build_scan_intervals_schema(
             OptionsKey.ScanIntervals.GSM,
             default = scan_intervals_defaults["gsm"],
         )] = NumberSelector(NumberSelectorConfig(
-            min = SCAN_INTERVAL_MIN,
+            min = SCAN_INTERVAL_MIN_SLOW,
             max = SCAN_INTERVAL_MAX,
             mode = NumberSelectorMode.BOX,
             unit_of_measurement = "ms",

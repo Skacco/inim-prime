@@ -479,25 +479,27 @@ class InimPrimeOptionsFlowHandler(OptionsFlowWithReload):
         )
 
     def _scan_sources_text(self) -> str:
-        """Where the data comes from, for the configured modes only."""
+        """Where each value comes from, for the configured modes only."""
         italian = (self.hass.config.language or "").startswith("it")
-        if self._has_native and self._has_primelan:
-            return (
-                "Zone, aree, uscite, scenari, guasti ed eventi arrivano dal Native; il GSM dalla PrimeLAN "
-                "e parte più lento (60s) per ridurre il traffico."
-                if italian else
-                "Zones, partitions, outputs, scenarios, faults and events come from Native; GSM from PrimeLAN, "
-                "which starts slower (60s) to reduce traffic."
-            )
+        lines = []
         if self._has_native:
-            return (
-                "Tutti i dati arrivano dal protocollo nativo (locale, veloce)."
-                if italian else "All data comes from the native protocol (local, fast)."
+            lines.append(
+                "• **Native**: zone, aree, uscite, scenari, guasti, eventi registro"
+                if italian else
+                "• **Native**: zones, partitions, outputs, scenarios, faults, log events"
             )
-        return (
-            "Tutti i dati arrivano dalla PrimeLAN (Web API)."
-            if italian else "All data comes from PrimeLAN (Web API)."
-        )
+            if self._has_primelan:
+                lines.append(
+                    "• **PrimeLAN**: GSM (predefinito 60 s)"
+                    if italian else "• **PrimeLAN**: GSM (default 60 s)"
+                )
+        else:
+            lines.append(
+                "• **PrimeLAN**: zone, aree, uscite, scenari, guasti, eventi registro, GSM"
+                if italian else
+                "• **PrimeLAN**: zones, partitions, outputs, scenarios, faults, log events, GSM"
+            )
+        return "\n".join(lines)
 
     # --- Shutters (only shown when the panel has shutter modules) -------
     async def async_step_shutters(self, user_input: dict[str, Any] | None = None):

@@ -158,3 +158,19 @@ async def test_old_primelan_defaults_move_to_the_native_ones(hass):
         "panel_log_events": 30000.0,    # chosen by the user: kept
         "scenarios": 2000,
     }
+
+
+def test_scan_form_minimum_and_typos_in_seconds():
+    from custom_components.inim_prime.flow.models import ConfigOptions
+    from custom_components.inim_prime.flow.schemas import build_scan_intervals_schema
+
+    options = ConfigOptions()
+    options.system_faults_scan_interval = 60       # seconds typed as ms
+    options.panel_log_events_scan_interval = 10000
+    fields = build_scan_intervals_schema(
+        has_native = True, has_primelan = True, current_options = options, as_section = False,
+    )
+    by_name = {str(k): (k.default(), v.config["min"]) for k, v in fields.items()}
+    assert by_name["system_faults"] == (10000, 1000)
+    assert by_name["panel_log_events"] == (10000, 1000)
+    assert by_name["zones"][1] == 1

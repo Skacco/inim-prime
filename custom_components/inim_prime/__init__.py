@@ -39,6 +39,7 @@ from .const import (
     SCENARIOS_SCAN_INTERVAL_PRIMELAN_DEFAULT,
     SCENARIOS_SCAN_INTERVAL_NATIVE_DEFAULT,
     PRIMELAN_SCAN_INTERVAL_BOTH_DEFAULT,
+    SCAN_INTERVAL_MIN_SLOW,
     SYSTEM_FAULTS_SCAN_INTERVAL_NATIVE_DEFAULT,
     PANEL_LOG_EVENTS_SCAN_INTERVAL_NATIVE_DEFAULT,
     TIMERS_SCAN_INTERVAL_DEFAULT,
@@ -234,7 +235,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: InimPrimeConfigEntry) ->
     ### Coordinators
     ###
 
-    scan_intervals = options["scan_intervals"]
+    scan_intervals = dict(options["scan_intervals"])
+    # never faster than SCAN_INTERVAL_MIN_SLOW for these (older entries could
+    # hold any value)
+    for key in ("scenarios", "system_faults", "panel_log_events", "gsm"):
+        if key in scan_intervals and scan_intervals[key] < SCAN_INTERVAL_MIN_SLOW:
+            scan_intervals[key] = SCAN_INTERVAL_MIN_SLOW
 
     zones_coordinator: InimPrimeZonesUpdateCoordinator | None = None
     partitions_coordinator: InimPrimePartitionsUpdateCoordinator | None = None

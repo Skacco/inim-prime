@@ -111,6 +111,9 @@ SYSTEM_FAULTS_SCAN_INTERVAL_PRIMELAN_DEFAULT: Final[int] = 15000
 PANEL_LOG_EVENTS_SCAN_INTERVAL_PRIMELAN_DEFAULT: Final[int] = 15000
 
 SCAN_INTERVAL_MIN: Final[int] = 1
+# Scenarios, faults, event log and GSM: never faster than once a second (a
+# value typed in seconds by mistake would flood the panel).
+SCAN_INTERVAL_MIN_SLOW: Final[int] = 1000
 SCAN_INTERVAL_MAX: Final[int] = 300000
 
 STORAGE_KEY_LAST_PANEL_EVENT_LOGS = "last_panel_event_logs"

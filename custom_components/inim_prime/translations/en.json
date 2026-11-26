@@ -393,7 +393,7 @@
       },
       "scan": {
         "title": "Scan intervals",
-        "description": "How often Home Assistant polls the panel (lower values = more traffic). {sources} See the README.",
+        "description": "How often Home Assistant polls the panel, in milliseconds (lower values = more traffic).\n\n{sources}\n\nScenarios, faults, events and GSM: at least 1000 ms. See the README.",
         "data": {
           "zones": "Zones Scan Interval",
           "partitions": "Partitions Scan Interval",

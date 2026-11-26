@@ -125,7 +125,7 @@ Ogni quanto Home Assistant interroga la centrale (valori più bassi = più traff
 | Scenari, guasti, eventi | ✅ | ✅ | ✅ |
 | GSM | — | ✅ | ✅ |
 
-Con il Native configurato, zone, aree, uscite, scenari, guasti ed eventi arrivano dal Native; il GSM arriva sempre dalla PrimeLAN.
+Con il Native configurato, zone, aree, uscite, scenari, guasti ed eventi arrivano dal Native; il GSM arriva sempre dalla PrimeLAN. I valori sono in millisecondi; per scenari, guasti, eventi e GSM il minimo è 1000 ms.
 
 ⚠️ La modalità **Native** supporta intervalli molto più bassi di PrimeLAN per zone, aree e uscite (polling locale).
 
