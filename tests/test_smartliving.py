@@ -41,6 +41,7 @@ class FakeSmartLiving:
             (0, 0x010000 + MODEL.terminal_table): data.TERMINAL_TABLE,
             (0, 0x010000 + MODEL.terminal_records): data.TERMINAL_RECORDS,
             (0, 0x010000 + MODEL.zone_records): data.ZONE_RECORDS,
+            (0, 0x010000 + MODEL.scenario_records): data.SCENARIO_RECORDS,
         }
 
     def _lookup(self, bank, address, length):
@@ -62,6 +63,10 @@ class FakeSmartLiving:
             assert COMMANDS[address] == request[6] == len(payload)
             self.commands.append((address, payload))
             self.result = 0 if payload[:6] == self.pin else 1
+            if address == 0x00200A and self.result == 0:
+                record = data.SCENARIO_RECORDS[payload[6] * 8:payload[6] * 8 + 6]
+                payload = payload[:6] + record + bytes(2)
+                address = 0x002006
             if address == 0x002006 and self.result == 0:
                 for i, byte in enumerate(payload[6:]):
                     for shift in (0, 4):
@@ -172,4 +177,33 @@ async def test_diagnostics_hide_the_smartliving_serial(hass: HomeAssistant):
     assert result["panel"]["model"] == "1050"
     assert result["panel"]["firmware"] == "6.08"
     assert SERIAL not in str(result)
+    await hass.config_entries.async_unload(entry.entry_id)
+
+
+async def test_scenarios_and_alarm_in_progress(hass: HomeAssistant):
+    panel = FakeSmartLiving()
+    entry = await _setup(hass, panel, {"alarm_panel": {"arm_night": 1}})
+    registry = er.async_get(hass)
+    entities = er.async_entries_for_config_entry(registry, entry.entry_id)
+    buttons = [e for e in entities if e.domain == "button" and "scenario" in e.unique_id]
+    assert len(buttons) == 3  # only the programmed scenarios
+    panel_entity = next(e.entity_id for e in entities if e.domain == "alarm_control_panel")
+
+    # arm night = scenario 2 ("Notte"), id 1 on the wire
+    with _patched(panel):
+        await hass.services.async_call(
+            "alarm_control_panel", "alarm_arm_night", {"entity_id": panel_entity}, blocking=True,
+        )
+        await hass.async_block_till_done()
+    assert (0x00200A, bytes.fromhex("010203040506") + bytes([1])) in panel.commands
+
+    # area 1 alarm bit (first bitmap after the 6 nibble bytes on a 1050)
+    panel.areas[0:6] = bytes.fromhex("1111444444")+b"\x44"
+    panel.areas[6] = 0x01
+    coordinator = entry.runtime_data.coordinators.partitions
+    entry.runtime_data.gateway.smartliving_adapter._refreshed_at = None  # skip the short reuse window
+    with _patched(panel):
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+    assert hass.states.get(panel_entity).state == "triggered"
     await hass.config_entries.async_unload(entry.entry_id)

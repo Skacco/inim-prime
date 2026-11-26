@@ -36,7 +36,11 @@ AREAS_STATUS_ADDRESS: Final[int] = 0x002000
 ZONES_STATUS_ADDRESS: Final[int] = 0x002001
 ZONES_ENABLED_ADDRESS: Final[int] = 0x002002
 ZONES_ALARM_MEMORY_ADDRESS: Final[int] = 0x002003
-AREAS_STATUS_LENGTH: Final[int] = 16
+# Area status: one nibble per area (areas // 2 + 1 bytes), then five 2-byte
+# area bitmaps: the first is the alarm in progress, the third the alarm memory.
+AREA_BITMAPS_LENGTH: Final[int] = 10
+AREA_ALARM_BITMAP: Final[int] = 0
+AREA_MEMORY_BITMAP: Final[int] = 2
 ZONES_STATUS_LENGTH: Final[int] = 26
 ZONES_ENABLED_LENGTH: Final[int] = 26
 ZONES_ALARM_MEMORY_LENGTH: Final[int] = 28
@@ -90,6 +94,8 @@ class Model:
     terminal_table: int     # physical index -> logical terminal (zone - 1)
     terminal_records: int   # 12 bytes per logical terminal
     zone_records: int | None  # 9 bytes per logical terminal (area mask)
+    scenario_records: int   # per scenario: one nibble per area (arm modes)
+    scenario_record_size: int
     verified: bool          # read on a real panel of this model
 
 
@@ -103,24 +109,28 @@ MODELS: Final[dict[str, Model]] = {
         name="SmartLiving 1050", areas=10, zones=50, scenarios=30, physical_terminals=130,
         area_names=0x010000, zone_names=0x0100A0, scenario_names=0x011450,
         terminal_table=0x78FD, terminal_records=0x57D4, zone_records=0x5450,
+        scenario_records=0x73D8, scenario_record_size=8,
         verified=True,
     ),
     "10100": Model(
         name="SmartLiving 10100", areas=15, zones=100, scenarios=30, physical_terminals=240,
         area_names=0x010000, zone_names=0x0100F0, scenario_names=0x012350,
         terminal_table=0xCF75, terminal_records=0x90CD, zone_records=None,
+        scenario_records=0xC81F, scenario_record_size=10,
         verified=False,
     ),
     "515": Model(
         name="SmartLiving 515", areas=10, zones=20, scenarios=30, physical_terminals=70,
         area_names=0x010000, zone_names=0x0100A0, scenario_names=0x011450,
         terminal_table=0x4595, terminal_records=0x306F, zone_records=None,
+        scenario_records=0x42BF, scenario_record_size=5,
         verified=False,
     ),
     "505": Model(
         name="SmartLiving 505", areas=10, zones=10, scenarios=30, physical_terminals=40,
         area_names=0x010000, zone_names=0x0100A0, scenario_names=0x011450,
         terminal_table=0x3DE0, terminal_records=0x2971, zone_records=None,
+        scenario_records=0x3B0A, scenario_record_size=5,
         verified=False,
     ),
 }

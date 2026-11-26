@@ -56,7 +56,9 @@ async def async_setup_entry(hass, entry: InimPrimeConfigEntry, async_add_entitie
     options = entry.options
     # SmartLiving arms by areas like Native.
     has_native = bool(entry.data.get("native") or entry.data.get("smartliving"))
-    has_primelan = bool(entry.data.get("primelan"))
+    # SmartLiving has its scenarios too: it gets the hybrid panel, like
+    # Native + PrimeLAN (each command a scenario or a set of areas).
+    has_primelan = bool(entry.data.get("primelan") or entry.data.get("smartliving"))
 
     # Optional extra panel protected by a PIN (code required to disarm only),
     # created alongside the normal one for a wall tablet in a free-access room.

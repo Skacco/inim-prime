@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 from .const import (
+    AREA_ALARM_BITMAP,
+    AREA_MEMORY_BITMAP,
     FREE,
     NAME_LENGTH,
     TERMINAL_OUTPUT_TYPES,
@@ -9,7 +11,7 @@ from .const import (
     TERMINAL_RECORD_TYPE_OFFSET,
     ZONE_RECORD_SIZE,
 )
-from .models import AreaState, AreaStatus, PanelInfo, ZoneState, ZoneStatus
+from .models import AreaState, AreaStatus, PanelInfo, Scenario, ZoneState, ZoneStatus
 
 
 def decode_text(raw: bytes) -> str:
@@ -63,9 +65,21 @@ def parse_zone_areas(raw: bytes, count: int, areas: int) -> dict[int, frozenset[
     return result
 
 
+def area_status_length(areas: int) -> int:
+    return areas // 2 + 1 + 10
+
+
 def parse_area_status(raw: bytes, areas: int) -> dict[int, AreaStatus]:
-    """One nibble per area, low nibble first; alarm memory bitmask from byte 10."""
-    memory = int.from_bytes(raw[10:12], "little") if len(raw) >= 12 else (raw[10] if len(raw) > 10 else 0)
+    """One nibble per area (low nibble first), then 2-byte area bitmaps:
+    the first is the alarm in progress, the third the alarm memory."""
+    base = areas // 2 + 1
+
+    def bitmap(index: int) -> int:
+        start = base + 2 * index
+        return int.from_bytes(raw[start:start + 2], "little") if len(raw) >= start + 2 else 0
+
+    alarm = bitmap(AREA_ALARM_BITMAP)
+    memory = bitmap(AREA_MEMORY_BITMAP)
     result = {}
     for area in range(1, areas + 1):
         byte = raw[(area - 1) // 2]
@@ -74,8 +88,41 @@ def parse_area_status(raw: bytes, areas: int) -> dict[int, AreaStatus]:
             state = AreaState(value)
         except ValueError:
             state = AreaState.UNKNOWN
-        result[area] = AreaStatus(state=state, raw=value, alarm_memory=bool(memory >> (area - 1) & 1))
+        result[area] = AreaStatus(
+            state=state,
+            raw=value,
+            alarm_memory=bool(memory >> (area - 1) & 1),
+            alarm=bool(alarm >> (area - 1) & 1),
+        )
     return result
+
+
+def parse_scenarios(
+    raw: bytes, record_size: int, names: dict[int, str], areas: int
+) -> dict[int, Scenario]:
+    """Scenarios with at least one area to set: one nibble per area."""
+    result = {}
+    for scenario_id, name in names.items():
+        record = raw[(scenario_id - 1) * record_size:scenario_id * record_size]
+        if len(record) < record_size:
+            break
+        modes = {}
+        for area in range(1, areas + 1):
+            byte = record[(area - 1) // 2]
+            value = byte & 0x0F if area % 2 else byte >> 4
+            if value:
+                modes[area] = value
+        if modes:
+            result[scenario_id] = Scenario(scenario_id, name, modes)
+    return result
+
+
+def active_scenarios(scenarios: dict[int, Scenario], areas: dict[int, AreaStatus]) -> frozenset[int]:
+    """A scenario is active when every area it sets is in that mode."""
+    return frozenset(
+        sid for sid, scenario in scenarios.items()
+        if all(areas.get(a) is not None and areas[a].raw == m for a, m in scenario.modes.items())
+    )
 
 
 def _bit(raw: bytes, index: int) -> bool:

@@ -122,7 +122,7 @@ class InimPrimeGateway:
 
     @property
     def supports_scenarios(self) -> bool:
-        return self._primelan is not None
+        return self._primelan is not None or self._smartliving is not None
 
     @property
     def supports_timers(self) -> bool:
@@ -338,6 +338,8 @@ class InimPrimeGateway:
 
     @property
     def scenarios(self) -> MappingProxyType[int, UnifiedScenario] | None:
+        if self._smartliving is not None:
+            return self._smartliving.scenarios
         return self._primelan.scenarios if self._primelan is not None else None
 
     @property
@@ -443,6 +445,10 @@ class InimPrimeGateway:
 
     async def update_scenarios(self, force: bool = False) -> MappingProxyType[int, UnifiedScenario]:
         """`force` is for the command in progress itself (it must not wait)."""
+        if self._smartliving is not None:
+            if not force:
+                await self._wait_polling_released()
+            return await self._smartliving.update_scenarios()
         if self._primelan is None:
             raise InimPrimeFeatureNotSupportedError("Scenarios require PrimeLAN")
         if not force:
@@ -541,6 +547,9 @@ class InimPrimeGateway:
         raise InimPrimeFeatureNotSupportedError("Output set requires Native or PrimeLAN")
 
     async def activate_scenario(self, scenario_id: int) -> None:
+        if self._smartliving is not None:
+            await self._smartliving.activate_scenario(scenario_id)
+            return
         if self._primelan is None:
             raise InimPrimeFeatureNotSupportedError("Scenarios require PrimeLAN")
         await self._primelan.activate_scenario(scenario_id)

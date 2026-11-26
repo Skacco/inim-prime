@@ -47,6 +47,13 @@ class Output:
 
 
 @dataclass(frozen=True)
+class Scenario:
+    scenario_id: int                # 1-based, as on the keypad
+    name: str
+    modes: dict[int, int]           # area (1-based) -> arm mode nibble (1-4)
+
+
+@dataclass(frozen=True)
 class Configuration:
     """What the panel is programmed with: read once at setup."""
 
@@ -55,6 +62,7 @@ class Configuration:
     scenario_names: dict[int, str]
     zones: dict[int, Zone]
     outputs: dict[int, Output]
+    scenarios: dict[int, Scenario] = field(default_factory=dict)  # programmed only
 
 
 @dataclass(frozen=True)
@@ -62,6 +70,7 @@ class AreaStatus:
     state: AreaState
     raw: int
     alarm_memory: bool
+    alarm: bool = False              # alarm in progress
 
 
 @dataclass(frozen=True)
@@ -76,3 +85,4 @@ class ZoneStatus:
 class Status:
     areas: dict[int, AreaStatus]
     zones: dict[int, ZoneStatus]
+    active_scenarios: frozenset[int] = frozenset()

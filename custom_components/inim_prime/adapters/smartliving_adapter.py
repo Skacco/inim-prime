@@ -9,6 +9,7 @@ from dataclasses import replace
 from types import MappingProxyType
 
 from ..models.partitions import UnifiedArmingStatus, UnifiedPartition, UnifiedPartitionState
+from ..models.scenarios import UnifiedScenario
 from ..models.zones import UnifiedZone, UnifiedZoneState
 from ..smartliving import (
     AreaState,
@@ -54,6 +55,7 @@ class SmartLivingAdapter:
         self._pin = pin or None
         self._zones: dict[int, UnifiedZone] = {}
         self._partitions: dict[int, UnifiedPartition] = {}
+        self._scenarios: dict[int, UnifiedScenario] = {}
         self._refreshed_at: float | None = None
 
     # ------------------------------------------------------------------
@@ -126,11 +128,23 @@ class SmartLivingAdapter:
                 label = config.area_names.get(area_id) or f"Area {area_id}",
                 zones = {z.zone_id for z in config.zones.values() if area_id in z.areas},
                 arming_status = _AREA_STATE_TO_UNIFIED.get(area_status.state),
-                partition_state = UnifiedPartitionState.OK,
+                partition_state = (
+                    UnifiedPartitionState.ALARM if area_status.alarm else UnifiedPartitionState.OK
+                ),
                 alarm_memory = area_status.alarm_memory,
             )
+        # Scenario ids are 0-based, as with PrimeLAN (the wire number).
+        scenarios = {
+            sid - 1: UnifiedScenario(
+                scenario_id = sid - 1,
+                label = scenario.name or f"Scenario {sid}",
+                active = sid in status.active_scenarios,
+            )
+            for sid, scenario in config.scenarios.items()
+        }
         self._zones = zones
         self._partitions = partitions
+        self._scenarios = scenarios
         self._refreshed_at = time.monotonic()
 
     @property
@@ -140,6 +154,14 @@ class SmartLivingAdapter:
     @property
     def partitions(self) -> MappingProxyType[int, UnifiedPartition]:
         return MappingProxyType(self._partitions)
+
+    @property
+    def scenarios(self) -> MappingProxyType[int, UnifiedScenario]:
+        return MappingProxyType(self._scenarios)
+
+    async def update_scenarios(self) -> MappingProxyType[int, UnifiedScenario]:
+        await self._refresh()
+        return self.scenarios
 
     @property
     def count_bypassed_zones(self) -> int:
@@ -230,3 +252,8 @@ class SmartLivingAdapter:
 
     async def reset_all_partition_memories(self) -> None:
         await self.reset_partition_memories(set(self._partitions))
+
+    async def activate_scenario(self, scenario_id: int) -> None:
+        if scenario_id not in self._scenarios:
+            raise KeyError(f"Unknown scenario id: {scenario_id}")
+        await self._command(self._client.activate_scenario(self._require_pin(), scenario_id + 1))

@@ -9,7 +9,6 @@ from .const import (
     EXCLUDE_ADDRESS,
     RESET_MEMORY_ADDRESS,
     SCENARIO_ADDRESS,
-    AREAS_STATUS_LENGTH,
     BANK_MAIN,
     BANK_NAMES,
     CONFIG_BASE,
@@ -34,7 +33,10 @@ from .const import (
 from .models import Configuration, Output, PanelInfo, Status, Zone
 from .parsing import (
     is_output_type,
+    active_scenarios,
+    area_status_length,
     parse_area_status,
+    parse_scenarios,
     parse_names,
     parse_panel_info,
     parse_serial,
@@ -116,6 +118,12 @@ class Client:
         area_names = await self._names(model.area_names, model.areas)
         zone_names = await self._names(model.zone_names, model.zones)
         scenario_names = await self._names(model.scenario_names, model.scenarios)
+        scenarios = parse_scenarios(
+            await self._config(model.scenario_records, model.scenarios * model.scenario_record_size),
+            model.scenario_record_size,
+            scenario_names,
+            model.areas,
+        )
 
         table = parse_terminal_table(await self._config(model.terminal_table, model.physical_terminals))
         types = parse_terminal_types(
@@ -146,6 +154,7 @@ class Client:
             scenario_names=scenario_names,
             zones=zones,
             outputs=outputs,
+            scenarios=scenarios,
         )
         return self._configuration
 
@@ -156,13 +165,15 @@ class Client:
         assert self._configuration is not None and self._model is not None
         model = self._model
         # Same lengths on every model (they cover 100 zones).
-        areas_raw = await self._protocol.read(BANK_MAIN, AREAS_STATUS_ADDRESS, AREAS_STATUS_LENGTH)
+        areas_raw = await self._protocol.read(BANK_MAIN, AREAS_STATUS_ADDRESS, area_status_length(model.areas))
         states = await self._protocol.read(BANK_MAIN, ZONES_STATUS_ADDRESS, ZONES_STATUS_LENGTH)
         enabled = await self._protocol.read(BANK_MAIN, ZONES_ENABLED_ADDRESS, ZONES_ENABLED_LENGTH)
         memory = await self._protocol.read(BANK_MAIN, ZONES_ALARM_MEMORY_ADDRESS, ZONES_ALARM_MEMORY_LENGTH)
+        areas = parse_area_status(areas_raw, model.areas)
         return Status(
-            areas=parse_area_status(areas_raw, model.areas),
+            areas=areas,
             zones=parse_zone_status(states, enabled, memory, list(self._configuration.zones)),
+            active_scenarios=active_scenarios(self._configuration.scenarios, areas),
         )
 
     async def _command(self, address: int, payload: bytes) -> None:

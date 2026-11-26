@@ -111,6 +111,11 @@ class InimPrimeOptionsFlowHandler(OptionsFlowWithReload):
         return bool(data.get("native") or data.get("smartliving"))
 
     @property
+    def _has_scenarios(self) -> bool:
+        data = get_entry_data(self.config_entry)
+        return bool(data.get("primelan") or data.get("smartliving"))
+
+    @property
     def _has_native_prime(self) -> bool:
         return bool(get_entry_data(self.config_entry).get("native"))
 
@@ -258,7 +263,7 @@ class InimPrimeOptionsFlowHandler(OptionsFlowWithReload):
         # With scenarios available (PrimeLAN) the whole panel is one form: a
         # dropdown per command. Native-only has no scenarios, so it keeps the
         # per-command list leading to the partitions form.
-        if self._has_primelan:
+        if self._has_scenarios:
             return await self.async_step_alarm_form()
         menu: dict[str, str] = {
             step: self._alarm_label(_STEP_TO_CMD[step]) for step in _CMD_STEPS
