@@ -17,7 +17,6 @@ from .gateway import InimPrimeGateway
 # options, the panel serial number, and who armed or disarmed in the log events.
 _REDACTED_OPTIONS = {"alarm_pin", "pin", "password", "webhook_id"}
 _REDACTED_PANEL = {"serial_number"}
-_REDACTED_LOG_EVENTS = {"agent"}
 
 
 def _log_event(event) -> dict[str, Any]:
@@ -30,7 +29,8 @@ def _log_event(event) -> dict[str, Any]:
 
 
 def _log_events(events) -> list[dict[str, Any]]:
-    return async_redact_data([_log_event(event) for event in events], _REDACTED_LOG_EVENTS)
+    # "agent" is where the command came from (keypad, remote): kept.
+    return [_log_event(event) for event in events]
 
 
 async def async_get_config_entry_diagnostics(

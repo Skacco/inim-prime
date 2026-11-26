@@ -55,10 +55,10 @@ async def test_entry_diagnostics_lists_zones_and_partitions(monkeypatch):
     assert "123456" not in json_bytes(result).decode()
 
 
-async def test_panel_device_diagnostics_redacts_serial_and_agent(monkeypatch):
+async def test_panel_device_diagnostics_redacts_serial_and_user(monkeypatch):
     event = UnifiedLogEvent(
         id = 7, timestamp = datetime(2026, 11, 26, 7, 0), type = "Disinserimento",
-        agent = "Mario Rossi", location = "Tastiera 1", value = None,
+        agent = "Tastiera 1", location = "Mario Rossi", value = None,
     )
     entry = SimpleNamespace(
         runtime_data = SimpleNamespace(
@@ -74,7 +74,7 @@ async def test_panel_device_diagnostics_redacts_serial_and_agent(monkeypatch):
     result = await diagnostics.async_get_device_diagnostics(None, entry, device)
 
     assert result["serial_number"] == REDACTED
-    assert result["log_events"][0]["agent"] == REDACTED
+    assert result["log_events"][0]["agent"] == "Tastiera 1"
     assert result["log_events"][0]["location"] == REDACTED
     assert result["log_events"][0]["type"] == "Disinserimento"
     text = json_bytes(result).decode()
@@ -96,5 +96,5 @@ def test_log_events_hide_the_user_but_keep_zone_and_scenario_names():
     ])
 
     assert [(e["agent"], e["location"]) for e in result] == [
-        (REDACTED, REDACTED), (REDACTED, REDACTED), (None, "Spento"),
+        ("Da remoto", REDACTED), ("TAST. GARAGE", REDACTED), (None, "Spento"),
     ]
