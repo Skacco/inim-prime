@@ -35,7 +35,10 @@ from ..const import (
     PRIMELAN_SCAN_INTERVAL_BOTH_DEFAULT,
     SMARTLIVING_DEFAULT_PORT,
     SMARTLIVING_SCAN_INTERVAL_DEFAULT,
+    NATIVE_CHECK_PORT_EXPOSED_DEFAULT,
+    NATIVE_PORT_CHECK_SERVER_DEFAULT,
 )
+from homeassistant.helpers.selector import TextSelector, TextSelectorConfig, TextSelectorType
 from ..entry_data import get_entry_data, get_entry_options
 from ..smartliving import (
     Client as SmartLivingClient,
@@ -203,14 +206,21 @@ class InimPrimeConfigFlow(config_entries.ConfigFlow, domain = DOMAIN):
     # ------------------------------------------------------------------
     async def async_step_smartliving(self, user_input: dict[str, Any] | None = None):
         errors: dict[str, str] = {}
-        placeholders: dict[str, str] = {"error": ""}
+        placeholders: dict[str, str] = {"error": "", "port": ""}
         if user_input is not None:
             host = user_input[DataKey.HOST].strip()
             port = int(user_input[DataKey.Native.PORT])
             password = (user_input.get(DataKey.Native.PASSWORD) or "").strip()
             pin = (user_input.get(DataKey.Native.PIN) or "").strip()
+            check_port = bool(user_input.get(DataKey.Native.CHECK_PORT_EXPOSED))
+            port_check_server = (user_input.get(DataKey.Native.PORT_CHECK_SERVER) or "").strip() or None
             if pin and not (pin.isdigit() and 4 <= len(pin) <= 6):
                 errors[DataKey.Native.PIN] = "invalid_pin"
+            elif check_port and (reachable := await async_port_reachable(self.hass, port_check_server, port)) is not False:
+                # asked for: an exposed port (or no answer) stops here, before
+                # connecting; the SmartLAN protocol is not encrypted
+                errors["base"] = "smartliving_port_exposed" if reachable else "smartliving_port_check_failed"
+                placeholders["port"] = str(port)
             else:
                 client = SmartLivingClient(host = host, port = port, password = password or None)
                 try:
@@ -243,6 +253,7 @@ class InimPrimeConfigFlow(config_entries.ConfigFlow, domain = DOMAIN):
                                 "port": port,
                                 "password": password,
                                 "pin": pin or None,
+                                "port_check_server": port_check_server,
                             },
                         },
                         "options": options.to_options_dict(),
@@ -266,6 +277,14 @@ class InimPrimeConfigFlow(config_entries.ConfigFlow, domain = DOMAIN):
                 DataKey.Native.PIN,
                 description = {"suggested_value": defaults.get(DataKey.Native.PIN)},
             ): str,
+            vol.Required(
+                DataKey.Native.CHECK_PORT_EXPOSED,
+                default = defaults.get(DataKey.Native.CHECK_PORT_EXPOSED, NATIVE_CHECK_PORT_EXPOSED_DEFAULT),
+            ): bool,
+            vol.Optional(
+                DataKey.Native.PORT_CHECK_SERVER,
+                default = defaults.get(DataKey.Native.PORT_CHECK_SERVER) or NATIVE_PORT_CHECK_SERVER_DEFAULT,
+            ): TextSelector(TextSelectorConfig(type = TextSelectorType.URL)),
         })
         return self.async_show_form(
             step_id = "smartliving", data_schema = schema,

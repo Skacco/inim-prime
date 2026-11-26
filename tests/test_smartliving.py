@@ -123,7 +123,9 @@ async def test_config_flow_creates_a_smartliving_entry(hass: HomeAssistant):
         )
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["result"].unique_id == SERIAL
-    assert result["data"]["smartliving"] == {"port": 5004, "password": "", "pin": "123456"}
+    assert result["data"]["smartliving"] == {
+        "port": 5004, "password": "", "pin": "123456", "port_check_server": "https://ifconfig.co",
+    }
     assert not panel.commands
 
 
@@ -255,3 +257,36 @@ async def test_experimental_model_is_flagged_before_creating(hass: HomeAssistant
         result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert not panel.commands
+
+
+async def test_smartlan_port_reachable_from_the_internet_stops_the_setup(hass: HomeAssistant):
+    panel = FakeSmartLiving()
+
+    async def exposed(_hass, _server, _port):
+        return True
+
+    with _patched(panel), patch("custom_components.inim_prime.flow.config_flow.async_port_reachable", exposed):
+        result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], {"next_step_id": "smartliving"})
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {"host": "192.0.2.20", "port": 5004, "check_port_exposed": True},
+        )
+    assert result["errors"] == {"base": "smartliving_port_exposed"}
+    assert result["description_placeholders"]["port"] == "5004"
+
+
+async def test_options_offer_the_smartlan_port_check(hass: HomeAssistant):
+    panel = FakeSmartLiving()
+    entry = await _setup(hass, panel)
+
+    async def closed(_hass, _server, _port):
+        return False
+
+    with _patched(panel), patch("custom_components.inim_prime.flow.options_flow.async_port_reachable", closed):
+        result = await hass.config_entries.options.async_init(entry.entry_id)
+        assert "port_check_smartliving" in result["menu_options"]
+        assert "port_check" not in result["menu_options"]
+        result = await hass.config_entries.options.async_configure(result["flow_id"], {"next_step_id": "port_check_smartliving"})
+        result = await hass.config_entries.options.async_configure(result["flow_id"], {"port_check_server": "https://ifconfig.co"})
+    assert "SmartLAN" in result["description_placeholders"]["result"]
+    assert "5004" in result["description_placeholders"]["result"]

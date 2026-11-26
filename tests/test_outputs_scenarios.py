@@ -517,6 +517,7 @@ async def test_alarm_form_mixed_scenario_and_partitions():
         _has_native_prime = True
         _has_scenarios = True
         _has_primelan = True
+        _has_smartliving = False
 
         def __init__(self):
             self._pending = {"alarm_panel": {"disarm": 0}, "alarm_panel_native": {}}

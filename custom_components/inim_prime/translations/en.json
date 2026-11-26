@@ -241,7 +241,13 @@
           "host": "IP address",
           "port": "Port",
           "password": "TCP password (if enabled)",
-          "pin": "User PIN"
+          "pin": "User PIN",
+          "check_port_exposed": "Check whether the SmartLAN port can be reached from the Internet",
+          "port_check_server": "Check service"
+        },
+        "data_description": {
+          "check_port_exposed": "When you submit this form it asks an external service to try the SmartLAN port on your public address. The SmartLAN protocol is not encrypted: if the port is reachable, or if the service does not answer, the form stops with a notice.",
+          "port_check_server": "Address of the service that runs the test (an \"echoip\" server). Used only if the check is on."
         }
       },
       "reconfigure_smartliving": {
@@ -268,7 +274,9 @@
       "native_password_too_long": "The Native connection password can be at most {max} characters long.",
       "smartliving_cannot_connect": "Could not connect. Check address and port, that SmartLeague or an app is not connected, and the TCP password if enabled on the board.",
       "smartliving_unsupported": "Unsupported panel model.",
-      "invalid_pin": "The PIN must be 4 to 6 digits."
+      "invalid_pin": "The PIN must be 4 to 6 digits.",
+      "smartliving_port_exposed": "SmartLAN port {port} of the panel can be reached from the Internet: the protocol is not encrypted, so PIN and commands travel in clear text. Remove its forwarding on the router and try again. To go on anyway turn the port check off.",
+      "smartliving_port_check_failed": "SmartLAN port check failed: the check service did not answer, so it is not known whether port {port} can be reached from the Internet. Try again, change the check service or turn the port check off."
     },
     "abort": {
       "already_configured": "This INIM Prime panel is already configured.",
@@ -288,7 +296,8 @@
           "alarm": "Alarm panel",
           "shutters": "Roller shutters",
           "port_check": "🌐 Check Native port",
-          "save_exit": "💾 Save and exit"
+          "save_exit": "💾 Save and exit",
+          "port_check_smartliving": "🌐 Check SmartLAN port"
         }
       },
       "alarm": {
@@ -428,6 +437,16 @@
       "port_check_result": {
         "title": "Check Native port",
         "description": "{result}\n\nPress «Next» to go back to the menu."
+      },
+      "port_check_smartliving": {
+        "title": "Check SmartLAN port",
+        "description": "Asks an external service to try to reach SmartLAN port {port} of the panel from your public address, to check it is not exposed on the Internet (the SmartLAN protocol is not encrypted). It changes no setting.\n\nPress \"Next\" to start the check.",
+        "data": {
+          "port_check_server": "Check service"
+        },
+        "data_description": {
+          "port_check_server": "Address of the service that tests the port (an \"echoip\" server). It is remembered for the next check."
+        }
       }
     },
     "error": {

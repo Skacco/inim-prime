@@ -80,8 +80,12 @@ _RESULT_TEXTS = {
 }
 
 
-def port_check_result_text(hass: HomeAssistant, port, reachable: bool | None) -> str:
+def port_check_result_text(hass: HomeAssistant, port, reachable: bool | None, smartliving: bool = False) -> str:
     """The outcome of the check, in the language of Home Assistant."""
     language = (getattr(hass.config, "language", None) or "en").split("-")[0]
     texts = _RESULT_TEXTS.get(language, _RESULT_TEXTS["en"])
-    return texts[reachable].format(port = port)
+    text = texts[reachable].format(port = port)
+    if smartliving:
+        # the SmartLAN port, whose protocol is not encrypted
+        text = text.replace("porta Native", "porta SmartLAN").replace("Native port", "SmartLAN port")
+    return text

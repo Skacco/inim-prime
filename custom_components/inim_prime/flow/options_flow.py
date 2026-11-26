@@ -120,6 +120,10 @@ class InimPrimeOptionsFlowHandler(OptionsFlowWithReload):
         return bool(get_entry_data(self.config_entry).get("native"))
 
     @property
+    def _has_smartliving(self) -> bool:
+        return bool(get_entry_data(self.config_entry).get("smartliving"))
+
+    @property
     def _has_primelan(self) -> bool:
         return bool(get_entry_data(self.config_entry).get("primelan"))
 
@@ -156,6 +160,8 @@ class InimPrimeOptionsFlowHandler(OptionsFlowWithReload):
             options.append("shutters")
         if self._has_native_prime:
             options.append("port_check")
+        if self._has_smartliving:
+            options.append("port_check_smartliving")
         options.append("save_exit")
         return self.async_show_menu(step_id="init", menu_options=options)
 
@@ -163,12 +169,19 @@ class InimPrimeOptionsFlowHandler(OptionsFlowWithReload):
         """Ask an external service whether the Native port can be reached
         from the Internet. Changes nothing: the answer is shown, then back to
         the menu."""
+        return await self._port_check(user_input, "native", "port_check")
+
+    async def async_step_port_check_smartliving(self, user_input: dict[str, Any] | None = None):
+        """The same check on the SmartLAN port (its protocol is not encrypted)."""
+        return await self._port_check(user_input, "smartliving", "port_check_smartliving")
+
+    async def _port_check(self, user_input: dict[str, Any] | None, key: str, step_id: str):
         data = get_entry_data(self.config_entry)
-        native = dict(data.get("native") or {})
+        native = dict(data.get(key) or {})
         port = native.get("port")
         if user_input is None:
             return self.async_show_form(
-                step_id = "port_check",
+                step_id = step_id,
                 data_schema = vol.Schema({
                     vol.Required(
                         "port_check_server",
@@ -182,10 +195,12 @@ class InimPrimeOptionsFlowHandler(OptionsFlowWithReload):
             # remembered for the next check; the connection is not touched
             native["port_check_server"] = server
             self.hass.config_entries.async_update_entry(
-                self.config_entry, data = {**self.config_entry.data, "native": native},
+                self.config_entry, data = {**self.config_entry.data, key: native},
             )
         reachable = await async_port_reachable(self.hass, server, port)
-        self._port_check_result = port_check_result_text(self.hass, port, reachable)
+        self._port_check_result = port_check_result_text(
+            self.hass, port, reachable, smartliving = key == "smartliving",
+        )
         return await self.async_step_port_check_result()
 
     async def async_step_port_check_result(self, user_input: dict[str, Any] | None = None):
