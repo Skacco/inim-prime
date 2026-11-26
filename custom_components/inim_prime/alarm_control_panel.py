@@ -56,9 +56,11 @@ async def async_setup_entry(hass, entry: InimPrimeConfigEntry, async_add_entitie
     options = entry.options
     # SmartLiving arms by areas like Native.
     has_native = bool(entry.data.get("native") or entry.data.get("smartliving"))
-    # SmartLiving has its scenarios too: it gets the hybrid panel, like
-    # Native + PrimeLAN (each command a scenario or a set of areas).
+    # SmartLiving and Native have their scenarios too: they get the hybrid
+    # panel, like Native + PrimeLAN (each command a scenario or a set of areas).
     has_primelan = bool(entry.data.get("primelan") or entry.data.get("smartliving"))
+    native_only = bool(entry.data.get("native")) and not has_primelan
+    has_primelan = has_primelan or native_only
 
     # Optional extra panel protected by a PIN (code required to disarm only),
     # created alongside the normal one for a wall tablet in a free-access room.
@@ -83,6 +85,12 @@ async def async_setup_entry(hass, entry: InimPrimeConfigEntry, async_add_entitie
         entities = [HybridAlarmPanel(*args)]
         if want_pin:
             entities.append(HybridAlarmPanelPin(*args, pin=pin))
+        if native_only:
+            # same entities as the areas-only panel it replaces (kept ids)
+            for entity in entities:
+                entity._attr_unique_id = entity._attr_unique_id.replace(
+                    "_alarm_panel", "_alarm_panel_native", 1,
+                )
         async_add_entities(entities)
         return
 

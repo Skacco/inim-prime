@@ -137,7 +137,7 @@ L'integrazione crea un'entità `alarm_control_panel` per inserire/disinserire l'
 ### Come si configura
 Le opzioni si aprono con un **menù**: *Parametri generali*, *Intervalli di scansione*, *Pannello allarme*, — **solo se la centrale ha moduli tapparella** — *Tapparelle*, e **💾 Salva ed esci**. Ogni sezione modifica una copia in memoria e torna al menù; **niente viene scritto finché non premi «💾 Salva ed esci»**. La **X** in alto chiude senza salvare. Così c'è un solo salvataggio e un solo annulla: tornare indietro non salva mai nulla a metà.
 
-In *Pannello allarme* (con scenari disponibili, cioè con PrimeLAN) c'è **una sola schermata con un gruppo per comando**, con gli stessi nomi di Home Assistant e nello stesso ordine (*In casa* / *Fuori casa* / *Notte* / *Vacanza* / *Disattivato*). Ogni gruppo ha:
+In *Pannello allarme* (con scenari disponibili: Native o PrimeLAN) c'è **una sola schermata con un gruppo per comando**, con gli stessi nomi di Home Assistant e nello stesso ordine (*In casa* / *Fuori casa* / *Notte* / *Vacanza* / *Disattivato*). Ogni gruppo ha:
 - una **tendina**: gli **scenari della centrale per nome**, oppure **Aree personalizzate…** (solo se è attiva anche la modalità Native); vuota (la X) = comando non offerto nel pannello;
 - subito sotto una **sezione chiusa** «↳ Vacanza: aree personalizzate e uscite» con **una riga per area** (*Disinserita* / Totale / Parziale / Istantaneo) più **Attivazione uscite**. Vale **solo** se nella tendina hai scelto *Aree personalizzate…*; altrimenti viene ignorata.
 
@@ -151,7 +151,7 @@ Esempio tipico (entrambe le modalità):
 
 > **Consiglio per il disinserimento.** Con entrambe le modalità attive, per **Disattivato** scegli **«➜ Tutte le aree disinserite»** invece dello scenario *Spento*: il comando passa dal protocollo Native anziché da PrimeLAN ed è sensibilmente più rapido (nelle prove circa 2 secondi contro 4,5–6). Lo scenario *Spento* serve solo se sulla centrale gli hai collegato altre azioni.
 
-> Solo Native → il pannello usa le aree (gli scenari ci sono come pulsanti): *Pannello allarme* mostra l'elenco dei comandi e ognuno apre direttamente il form aree. Solo PrimeLAN → le tendine contengono solo scenari.
+> Solo PrimeLAN → le tendine contengono solo scenari (le aree personalizzate richiedono il Native).
 
 Le aree non elencate restano disinserite. Lo **stato** mostrato in HA: un'area in allarme → *triggered*; altrimenti, se un comando a aree combacia esattamente con lo stato attuale lo mostra, altrimenti vale lo scenario attivo, altrimenti *disinserito*/*custom bypass*.
 
@@ -160,9 +160,8 @@ Le aree non elencate restano disinserite. Lo **stato** mostrato in HA: un'area i
 **Zone autoescludibili.** L'attivazione di uno scenario non avviene se una zona autoescludibile è aperta. Se usi zone autoescludibili, configura quel comando con *Aree personalizzate…* (richiede la modalità Native): con la sola PrimeLAN non c'è alternativa.
 
 ### Quale pannello viene creato
-- **Solo Native** → blocchi **a aree** (niente campo Scenario).
 - **Solo PrimeLAN** → mappatura **a scenari** (si sceglie lo scenario per comando da una tendina con i nomi; senza scenario di disinserimento il pannello non viene creato).
-- **Entrambe le modalità di integrazione** → **un unico pannello ibrido**: per ogni comando scegli scenario o aree con la regola sopra.
+- **Solo Native** o **entrambe le modalità di integrazione** → **un unico pannello ibrido**: per ogni comando scegli scenario o aree con la regola sopra.
 
 ### Pannello allarme con PIN (facoltativo, per un tablet a parete)
 Se tieni un tablet sempre acceso in una stanza ad accesso libero, puoi aggiungere un **secondo pannello protetto da PIN**, lasciando quello originale senza PIN per l'uso da telefono.

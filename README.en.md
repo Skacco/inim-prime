@@ -137,7 +137,7 @@ The integration creates an `alarm_control_panel` entity to arm/disarm the system
 ### How to configure it
 The options open with a **menu**: *General parameters*, *Scan intervals*, *Alarm panel*, — **only if the panel has shutter modules** — *Roller shutters*, and **💾 Save and exit**. Each section edits an in-memory copy and goes back to the menu; **nothing is written until you press “💾 Save and exit”**. The **X** at the top closes without saving. So there is one single save and one single cancel: going back never saves anything halfway.
 
-In *Alarm panel* (with scenarios available, i.e. with PrimeLAN) there is **one single screen with one group per command**, with the same names as Home Assistant and in the same order (*Home* / *Away* / *Night* / *Vacation* / *Disarmed*). Each group has:
+In *Alarm panel* (with scenarios available: Native or PrimeLAN) there is **one single screen with one group per command**, with the same names as Home Assistant and in the same order (*Home* / *Away* / *Night* / *Vacation* / *Disarmed*). Each group has:
 - a **dropdown**: the **panel scenarios by name**, or **Custom partitions…** (only if the Native mode is also enabled); empty (the X) = command not offered in the panel;
 - right below, a **collapsed section** “↳ Vacation: custom partitions and outputs” with **one row per partition** (*Disarmed* / Total / Partial / Instant) plus **Output activation**. It applies **only** if you picked *Custom partitions…* in the dropdown; otherwise it is ignored.
 
@@ -151,7 +151,7 @@ Typical example (both modes):
 
 > **Tip for disarming.** With both modes active, for **Disarmed** pick **“➜ All partitions disarmed”** rather than the scenario *Off*: the command goes through the Native protocol instead of PrimeLAN and is noticeably faster (about 2 seconds versus 4.5–6 in testing). The scenario *Off* is only needed if you tied other actions to it on the panel.
 
-> Native only → the panel uses partitions (scenarios are there as buttons): *Alarm panel* shows the list of commands and each one opens the partitions form directly. PrimeLAN only → the dropdowns contain scenarios only.
+> PrimeLAN only → the dropdowns contain scenarios only (custom partitions need Native).
 
 Partitions not listed stay disarmed. The **state** shown in HA: a partition in alarm → *triggered*; otherwise, if a partitions command matches the current state exactly it shows that, otherwise the active scenario applies, otherwise *disarmed*/*custom bypass*.
 
@@ -160,9 +160,8 @@ Partitions not listed stay disarmed. The **state** shown in HA: a partition in a
 **Auto-bypassable zones.** A scenario is not activated if an auto-bypassable zone is open. If you use auto-bypassable zones, configure that command with *Custom partitions…* (requires the Native mode): with PrimeLAN alone there is no alternative.
 
 ### Which panel is created
-- **Native only** → **partition** blocks (no Scenario field).
 - **PrimeLAN only** → **scenario** mapping (you pick the scenario per command from a dropdown with the names; without a disarm scenario the panel is not created).
-- **Both integration modes** → **one single hybrid panel**: for each command you choose scenario or partitions with the rule above.
+- **Native only** or **both integration modes** → **one single hybrid panel**: for each command you choose scenario or partitions with the rule above.
 
 ### Alarm panel with PIN (optional, for a wall tablet)
 If you keep an always-on tablet in a free-access room, you can add a **second PIN-protected panel**, leaving the original one without a PIN for phone use.

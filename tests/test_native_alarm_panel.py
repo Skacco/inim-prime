@@ -282,3 +282,25 @@ def test_hybrid_disarmed_and_triggered():
         scenario_map={"arm_away": 2}, targets={},
     )
     assert trig.alarm_state == AlarmControlPanelState.TRIGGERED
+
+
+async def test_native_only_gets_the_scenario_panel_with_the_same_ids():
+    from types import SimpleNamespace
+    from custom_components.inim_prime import alarm_control_panel as acp
+    from custom_components.inim_prime.entities.alarm_panel import HybridAlarmPanel
+
+    parts = [_FakePart(0, OFF)]
+    scenarios = _FakeCoord(parts)
+    scenarios.gateway.scenarios = {}
+    entry = SimpleNamespace(
+        data = {"native": {"port": 6004}},
+        options = {OptionsKey.ALARM_PIN: "1234", OptionsKey.ALARM_PIN_PANEL: True},
+        runtime_data = SimpleNamespace(coordinators = SimpleNamespace(
+            scenarios = scenarios, partitions = _FakeCoord(parts),
+        )),
+    )
+    added = []
+    await acp.async_setup_entry(None, entry, added.extend)
+
+    assert all(isinstance(e, HybridAlarmPanel) for e in added)
+    assert [e.unique_id for e in added] == ["SER_alarm_panel_native", "SER_alarm_panel_native_pin"]

@@ -113,7 +113,7 @@ class InimPrimeOptionsFlowHandler(OptionsFlowWithReload):
     @property
     def _has_scenarios(self) -> bool:
         data = get_entry_data(self.config_entry)
-        return bool(data.get("primelan") or data.get("smartliving"))
+        return bool(data.get("primelan") or data.get("smartliving") or data.get("native"))
 
     @property
     def _has_native_prime(self) -> bool:
