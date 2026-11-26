@@ -7,7 +7,7 @@
         "description": "Choose the panel type.",
         "menu_options": {
           "prime": "Inim Prime",
-          "smartliving": "Inim SmartLiving (beta)"
+          "smartliving": "Inim SmartLiving"
         }
       },
       "prime": {
@@ -235,7 +235,7 @@
         }
       },
       "smartliving": {
-        "title": "SmartLiving panel (beta)",
+        "title": "SmartLiving panel",
         "description": "Address of the panel's SmartLAN board.\n\nThe TCP password is needed only if it is enabled on the board (SmartLeague). The user PIN is needed to arm, disarm and exclude zones: without it the integration only reads.\n\nWhile the integration is connected, SmartLeague and apps connecting locally cannot: the board accepts one connection at a time.{error}",
         "data": {
           "host": "IP address",

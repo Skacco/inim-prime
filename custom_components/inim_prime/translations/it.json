@@ -7,7 +7,7 @@
         "description": "Scegli il tipo di centrale.",
         "menu_options": {
           "prime": "Inim Prime",
-          "smartliving": "Inim SmartLiving (beta)"
+          "smartliving": "Inim SmartLiving"
         }
       },
       "prime": {
@@ -235,7 +235,7 @@
         }
       },
       "smartliving": {
-        "title": "Centrale SmartLiving (beta)",
+        "title": "Centrale SmartLiving",
         "description": "Indirizzo della scheda SmartLAN della centrale.\n\nLa password TCP serve solo se è attiva sulla scheda (SmartLeague). Il PIN utente serve per inserire, disinserire ed escludere le zone: senza, l'integrazione legge soltanto.\n\nMentre l'integrazione è collegata, SmartLeague e le app che si collegano in locale non possono collegarsi: la scheda accetta un solo collegamento.{error}",
         "data": {
           "host": "Indirizzo IP",
