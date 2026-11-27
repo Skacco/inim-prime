@@ -36,7 +36,7 @@ It requires the **PrimeLAN network board** installed in the panel.
 You enable the two integration modes together: **Native** does all the fast local work (zones, partitions, outputs, shutters, thermostats, timers, scenarios, faults and the log), **PrimeLAN** adds GSM and realtime push. The Home Assistant **alarm panel** combines scenarios and partitions: for each command you pick a scenario or a set of partitions.
 
 ## Inim SmartLiving
-**Inim SmartLiving** panels with a **SmartLAN/SI** or **SmartLAN/G** board, locally (TCP port **5004**): zones, partitions with arm and disarm, zone bypass, outputs, scenarios with the active one and the event log. Reads verified on a SmartLiving 1050; commands and other models (10100, 515, 505) being tested. Pick **SmartLiving** at the start of the setup. The SmartLAN protocol is **not encrypted**: do not expose its port on the Internet (setup and options have "🌐 Check SmartLAN port").
+**Inim SmartLiving** panels with a **SmartLAN/SI** or **SmartLAN/G** board, locally (TCP port **5004**): zones, partitions with arm and disarm, zone bypass, outputs, scenarios with the active one and the event log. Pick **SmartLiving** at the start of the setup. The SmartLAN protocol is **not encrypted**: do not expose its port on the Internet (setup and options have "🌐 Check SmartLAN port").
 
 ## Firmware compatibility (Prime)
 Tested with panels on both **firmware 4.x** and **firmware 5.x**.

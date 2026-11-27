@@ -1,3 +1,13 @@
+## Novità 1.3.0
+
+- Nuovo nome: Inim Prime & SmartLiving.
+- Supporto alle centrali Inim SmartLiving con scheda SmartLAN.
+- Prime Native: scenari e scenario attivo, registro eventi, guasti e tensione di alimentazione.
+- Pannello allarme con scenari anche con solo Native.
+- Intervalli di scansione: indicato da dove arriva ogni dato; minimo 1000 ms per scenari, guasti, eventi e GSM.
+- Controllo della porta anche per la SmartLAN.
+- Diagnostica: nascosto il nome dell'utente negli eventi.
+
 ## Novità 1.2.2
 
 - Rimosse le azioni di debug che scrivono o mandano comandi alla centrale; quelle di lettura sono solo per amministratori.

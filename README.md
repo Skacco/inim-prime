@@ -36,7 +36,7 @@ Richiede la **scheda di rete PrimeLAN** installata nella centrale.
 Attivi le due modalità di integrazione insieme: **Native** fa tutto il lavoro locale e veloce (zone, aree, uscite, tapparelle, termostati, timer, scenari, guasti e registro), **PrimeLAN** aggiunge GSM e push in tempo reale. Il **pannello di allarme** di Home Assistant unisce scenari e aree: per ogni comando scegli uno scenario o un insieme di aree.
 
 ## Inim SmartLiving
-Centrali **Inim SmartLiving** con scheda **SmartLAN/SI** o **SmartLAN/G**, in locale (porta TCP **5004**): zone, aree con inserimento e disinserimento, esclusione zone, uscite, scenari con scenario attivo e registro eventi. Letture verificate su una SmartLiving 1050; comandi e altri modelli (10100, 515, 505) in prova. Si sceglie **SmartLiving** all'inizio della configurazione. Il protocollo SmartLAN **non è cifrato**: non esporre la porta su Internet (in configurazione e nelle opzioni c'è «🌐 Controlla porta SmartLAN»).
+Centrali **Inim SmartLiving** con scheda **SmartLAN/SI** o **SmartLAN/G**, in locale (porta TCP **5004**): zone, aree con inserimento e disinserimento, esclusione zone, uscite, scenari con scenario attivo e registro eventi. Si sceglie **SmartLiving** all'inizio della configurazione. Il protocollo SmartLAN **non è cifrato**: non esporre la porta su Internet (in configurazione e nelle opzioni c'è «🌐 Controlla porta SmartLAN»).
 
 ## Compatibilità firmware (Prime)
 Testata sia con centrali a **firmware 4.x** sia a **firmware 5.x**.
