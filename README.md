@@ -1,6 +1,6 @@
 🇮🇹 **Italiano** · 🇬🇧 [English](README.en.md)
 
-> **Progetto mantenuto da [Skacco](https://github.com/Skacco).** Nato dal lavoro di [Pitscheider](https://github.com/Pitscheider/ha-inim-prime) (GPL-3.0), autore dell'integrazione originale e delle librerie di comunicazione con la centrale. Questo progetto aggiunge: il supporto alle centrali **SmartLiving**, la **modalità Native** (protocollo locale TCP, veloce), le **uscite** (interruttori; le dimmerabili come luci solo in modalità PrimeLAN), gli **scenari** (pulsanti + sensore scenario attivo), un **pannello di allarme** guidato dagli scenari o dalle aree (con un secondo pannello protetto da **PIN**, facoltativo), i **timer**, i **termostati** (sensori di temperatura), le **tapparelle** (comandate dalle uscite virtuali), il **push in tempo reale** (webhook locale, opzionale), il raggruppamento dei dispositivi e l'**interfaccia in italiano**.
+> Integrazione per Home Assistant delle centrali Inim Prime e SmartLiving, mantenuta da [Skacco](https://github.com/Skacco).
 
 ⭐ Se l'integrazione ti è utile, lascia una stella al repository: aiuta altri a trovarla.
 
@@ -399,10 +399,8 @@ Attiva `Only Allow connections via HTTPS`: così la API Key non viaggia in chiar
 L'opzione `Not allow disalarm` è a tua scelta: se attiva, alcune operazioni falliranno e al momento l'integrazione non supporta bene questo caso.
 Al termine clicca `Upload` per caricare la nuova configurazione.
 
-# Informazioni sulla libreria API
-L'integrazione comunica con la centrale tramite una libreria Python creata da Pitscheider, disponibile qui:
-https://github.com/Pitscheider/inim_prime_api
-Puoi usarla per testare l'API della tua centrale a basso livello o per creare qualcosa di nuovo.
+# Crediti
+Questo progetto nasce dal lavoro di [Pitscheider](https://github.com/Pitscheider/ha-inim-prime) (GPL-3.0), autore dell'integrazione originale e della [libreria di comunicazione](https://github.com/Pitscheider/inim_prime_api) con la centrale Prime.
 
 # Marchi
 INIM e Inim Prime sono marchi o marchi registrati di INIM Electronics S.r.l.
