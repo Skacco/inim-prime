@@ -23,7 +23,7 @@ from .const import NATIVE_REOPEN_DELAY, NATIVE_REOPEN_GRACE
 _NATIVE_CLOSED_AT = "inim_prime_native_closed_at"
 from .adapters.primelan_adapter import PrimelanAdapter
 from .adapters.smartliving_adapter import SmartLivingAdapter
-from .smartliving import Client as SmartLivingClient
+from inim.smartliving import Client as SmartLivingClient
 from .const import (
     DOMAIN,
     STORAGE_KEY_OUTPUT_LABELS,

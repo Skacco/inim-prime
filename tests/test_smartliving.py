@@ -8,8 +8,8 @@ from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.inim_prime.const import DOMAIN
-from custom_components.inim_prime.smartliving.const import COMMANDS, MODELS
-from custom_components.inim_prime.smartliving.protocol import Protocol, checksum
+from inim.smartliving.const import COMMANDS, MODELS
+from inim.smartliving.protocol import Protocol, checksum
 
 from . import smartliving_1050 as data
 

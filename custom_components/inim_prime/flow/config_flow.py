@@ -40,7 +40,7 @@ from ..const import (
 )
 from homeassistant.helpers.selector import TextSelector, TextSelectorConfig, TextSelectorType
 from ..entry_data import get_entry_data, get_entry_options
-from ..smartliving import (
+from inim.smartliving import (
     Client as SmartLivingClient,
     SmartLivingConnectionError,
     SmartLivingError,

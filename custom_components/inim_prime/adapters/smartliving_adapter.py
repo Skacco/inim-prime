@@ -15,8 +15,8 @@ from ..models.outputs import UnifiedOutput
 from ..models.partitions import UnifiedArmingStatus, UnifiedPartition, UnifiedPartitionState
 from ..models.scenarios import UnifiedScenario
 from ..models.zones import UnifiedZone, UnifiedZoneState
-from ..smartliving.parsing import plausible_events
-from ..smartliving import (
+from inim.smartliving.parsing import plausible_events
+from inim.smartliving import (
     AreaState,
     ArmMode,
     Client,
